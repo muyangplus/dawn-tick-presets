@@ -45,7 +45,7 @@
 | --- | --- | --- |
 | 写文件（`writeFileSync`） | ❌ 拒绝 | `SANDBOX_PERMISSION_DENIED`（`Access to this API has been restricted. Use --allow-fs-write…`） |
 | `eval(...)` / `new Function(...)` | 拒绝 | `SANDBOX_PERMISSION_DENIED`（`Code generation from strings disallowed for this context`） |
-| 读白名单外的文件 | ❌ 拒绝 | `SANDBOX_PERMISSION_DENIED` |
+| 读白名单外的文件（如 `C:\Windows\win.ini`、`/etc/hostname`） | ❌ 拒绝 | `SANDBOX_PERMISSION_DENIED`（`ERR_ACCESS_DENIED`，`Use --allow-fs-read…`） |
 | 起子进程（`child_process`） | ❌ 拒绝 | `SANDBOX_PERMISSION_DENIED`（未传 `--allow-child-process`） |
 | `worker_threads` | 拒绝 | `SANDBOX_PERMISSION_DENIED`（未传 `--allow-worker`） |
 | 原生插件 `.node` | ❌ 拒绝 | `SANDBOX_PERMISSION_DENIED`（未传 `--allow-addons`） |

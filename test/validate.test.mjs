@@ -451,6 +451,24 @@ describe('沙箱运行器', () => {
     assert.equal(result.error.code, 'SANDBOX_PERMISSION_DENIED', JSON.stringify(result.error));
   });
 
+  test('读取只读白名单之外的文件被拒绝', async () => {
+    // 临时造一个只尝试越权读取的适配器（不入库，跑完由 after() 清理临时目录）
+    const dir = makeRepoFixture('sandbox-read');
+    const adapter = join(dir, 'presets', 'adapters', 'reader.js');
+    const outsidePath = process.platform === 'win32' ? 'C:\\Windows\\win.ini' : '/etc/hostname';
+    writeFileSync(adapter, [
+      "import { readFileSync } from 'node:fs';",
+      'export function parse() {',
+      `  readFileSync(${JSON.stringify(outsidePath)}, 'utf8');`,
+      '  return { events: [] };',
+      '}',
+    ].join('\n'));
+    const result = await runAdapterSandbox({ adapterPath: adapter, input: { html: '', url: '', hints: {} } });
+    assert.equal(result.ok, false, '白名单外的读取必须失败');
+    assert.equal(result.error.code, 'SANDBOX_PERMISSION_DENIED', JSON.stringify(result.error));
+    assert.match(result.error.message, /ERR_ACCESS_DENIED|restricted|denied/i);
+  });
+
   test('死循环适配器被墙钟超时终止并以结构化错误返回', async () => {
     const result = await runAdapterSandbox({
       adapterPath: join(REPO_ROOT, 'test', 'fixtures', 'hang-adapter.js'),
