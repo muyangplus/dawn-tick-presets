@@ -27,7 +27,6 @@
           "default": { "type": "boolean", "description": "true 表示没有专属作息时使用的通用作息。" },
           "configPath": {
             "type": ["string", "null"],
-            "minLength": 1,
             "description": "该校 config.json 的相对路径；没有 config.json 时为 null（如通用作息）。"
           },
           "timetablePath": { "type": "string", "minLength": 1 }
