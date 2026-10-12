@@ -1,0 +1,79 @@
+name: 适配失效 / 解析出错
+description: 学校已适配，但登录入口打不开、识别不到课表或解析结果不对时使用。
+title: "[失效] "
+labels: ['adapter-broken']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ### 提交前请先确认
+
+        1. 🔒 **请勿粘贴账号密码、Cookie 或含个人信息的截图**（学号、姓名、身份证号、带真实姓名的课表）。
+           需要提供页面样本时请先**脱敏**，只保留 HTML 结构与课表表格。
+        2. 🧾 尽量给出**能复现问题的最小信息**：学校、教务系统、从哪一步开始出错、界面上提示的原文。
+        3. 🔧 想自己动手修解析器？先读
+           [sandbox/adapter-contract.md](https://github.com/muyangplus/dawn-tick-presets/blob/main/sandbox/adapter-contract.md)
+           与 [README · 能贡献什么](https://github.com/muyangplus/dawn-tick-presets/blob/main/README.md#能贡献什么)。
+
+  - type: input
+    id: school-name
+    attributes:
+      label: 学校全名
+      description: 出问题的那所学校（官方全名，可带简称）
+      placeholder: 苏州科技大学
+    validations:
+      required: true
+
+  - type: dropdown
+    id: system
+    attributes:
+      label: 所选教务系统（可选）
+      description: 你在晓刻里为这所学校选的系统；不确定就选「不确定」
+      options:
+        - 正方教务（jwglxt）
+        - 强智教务（qzdatasource）
+        - URP（urp）
+        - 其他（other）
+        - 不确定
+    validations:
+      required: false
+
+  - type: dropdown
+    id: symptom
+    attributes:
+      label: 现象
+      description: 选最接近的一项；细节写在下方的复现步骤里
+      options:
+        - 登录页打不开
+        - 能打开但识别不到课表
+        - 课表解析缺课
+        - 课表解析时间错
+        - 其他
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤
+      description: 从打开晓刻到看见错误，按顺序写清每一步；报错原文请原样粘贴（记得去掉个人信息）
+      placeholder: |
+        1. 打开「学校查找」，搜索并选择「XX 大学」
+        2. 点「打开教务系统」，登录后进入课表页
+        3. 点「导入课表」，提示「未识别到课表」
+      render: text
+    validations:
+      required: true
+
+  - type: dropdown
+    id: can-share
+    attributes:
+      label: 能否提供脱敏后的页面 HTML 或截图
+      description: 能提供 HTML 时这类问题通常一次就能修好；截图请先把学号 / 姓名打码
+      options:
+        - 可以提供脱敏 HTML
+        - 可以提供截图（已打码）
+        - 两者都可以
+        - 暂时不能
+    validations:
+      required: false

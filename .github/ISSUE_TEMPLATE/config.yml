@@ -1,0 +1,11 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 贡献作息 / 适配代码（看 README 的贡献流程）
+    url: https://github.com/muyangplus/dawn-tick-presets/blob/main/README.md#能贡献什么
+    about: 想直接提 school.json / system.json / parse.js + 夹具的 PR？先读贡献流程、校验规则与解析器契约。
+  - name: 解析器接口契约（写 parse.js 必读）
+    url: https://github.com/muyangplus/dawn-tick-presets/blob/main/sandbox/adapter-contract.md
+    about: 两个挂载点与优先级、夹具硬规则、静态扫描禁用模式、沙箱运行时限制。
+  - name: 晓刻 DawnTick 主项目问题反馈
+    url: https://github.com/muyangplus/dawn-tick/issues
+    about: App 本体的 bug、界面问题与功能建议请提到主项目仓库；本仓库只处理学校数据与适配器。

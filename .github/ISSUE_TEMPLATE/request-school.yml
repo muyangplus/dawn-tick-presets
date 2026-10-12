@@ -1,0 +1,77 @@
+name: 请求适配学校 / 提交学校信息
+description: 某校还没有适配器，或想补充学校信息（教务系统 / 作息时间）时使用；提交前请先确认这所学校尚未被适配。
+title: "[学校] "
+labels: ['school-request']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ### 提交前请先确认三件事
+
+        1. 🔍 **这所学校是否已经适配**：看 [README · 能贡献什么](https://github.com/muyangplus/dawn-tick-presets/blob/main/README.md#能贡献什么)
+           （已适配的学校在 `presets/schools/<school-id>/school.json` 里有真实作息数据），
+           或在晓刻「学校查找」页直接搜校名 / 别名。找到了就不用提这个 issue。
+        2. 🔒 **请勿粘贴账号密码**，也不要上传含个人信息的截图（学号、姓名、身份证号、Cookie、真实个人课表）。
+           本表单只需要**公开信息**：学校全名、所在省市、教务系统登录页 URL、作息时间。
+        3. ✍️ 一次提交**一所学校**；多所学校请分别提交，方便逐校跟踪。
+
+  - type: input
+    id: school-name
+    attributes:
+      label: 学校全名
+      description: 官方全名；简称 / 别名可以写在括号里
+      placeholder: 苏州科技大学（苏科大）
+    validations:
+      required: true
+
+  - type: input
+    id: school-region
+    attributes:
+      label: 所在省市
+      description: 省 / 直辖市，能带上城市更好
+      placeholder: 江苏省苏州市
+    validations:
+      required: true
+
+  - type: input
+    id: system-url
+    attributes:
+      label: 教务系统网址或登录页 URL
+      description: 教务系统入口的完整地址（http / https 均可）；只知道学校教务处官网也可以先填这个
+      placeholder: https://jwgl.example.edu.cn/jwglxt/xtgl/login_slogin.html
+    validations:
+      required: true
+
+  - type: input
+    id: system-name
+    attributes:
+      label: 教务系统名称（可选）
+      description: 知道就填，能明显加快适配；不确定就留空
+      placeholder: 正方教务（jwglxt）/ 强智 / URP
+    validations:
+      required: false
+
+  - type: textarea
+    id: timetable
+    attributes:
+      label: 想要的作息时间（可选）
+      description: 每节课的上课 / 下课时间，**可以从学校教务处公告复制**，直接粘贴文字即可，不用排版
+      placeholder: |
+        第 1 节 08:00-08:45
+        第 2 节 08:55-09:40
+        第 3 节 10:00-10:45
+      render: text
+    validations:
+      required: false
+
+  - type: dropdown
+    id: can-help
+    attributes:
+      label: 是否愿意提供页面样本或作息数据
+      description: 适配解析器通常需要一份**脱敏后**的课表页面样本；愿意提供的话我们会在 issue 里告诉你具体怎么取
+      options:
+        - 愿意提供
+        - 需要指导
+        - 暂时不能
+    validations:
+      required: false

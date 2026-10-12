@@ -48,6 +48,10 @@ snapshot/presets-<version>.json           【唯一生成物】分发清单 + �
 sandbox/README.md                         沙箱威胁模型与运行约束
 sandbox/adapter-contract.md               解析器接口契约（两个挂载点 + 优先级 + 夹具规则）
 .github/workflows/validate.yml            CI：validate → test → snapshot → 生成物未变 → 冒烟
+.github/ISSUE_TEMPLATE/request-school.yml issue 表单：请求适配学校 / 提交学校信息（labels: school-request）
+.github/ISSUE_TEMPLATE/report-adapter-broken.yml
+                                          issue 表单：适配失效 / 解析出错（labels: adapter-broken）
+.github/ISSUE_TEMPLATE/config.yml          issue 选择页配置（blank_issues_enabled + contact_links）
 ```
 
 **已取消的产物**：`presets/index.json`。它的全部信息（学校索引 + 系统引用 + 版本）现在并入
@@ -248,6 +252,8 @@ npm run sandbox:demo  # 沙箱演示：正常解析器成功 + 越权/动态代�
 ## 审核流程
 
 1. **Fork + 分支**：`feat/school-<id>`、`fix/system-<id>`、`feat/parser-<id>`。
+   - 不想自己改代码？直接提 issue 也行：[请求适配学校](https://github.com/muyangplus/dawn-tick-presets/issues/new?template=request-school.yml)（没有适配器）
+     或 [适配失效 / 解析出错](https://github.com/muyangplus/dawn-tick-presets/issues/new?template=report-adapter-broken.yml)（已有适配器但解析不对），详见[遇到问题 / 想贡献](#遇到问题--想贡献)。
 2. **本地跑通**：`npm run validate && npm test && npm run snapshot`（快照要一起提交，见上「改预设的规矩」）。
 3. **提 PR**：PR 描述里写清**依据来源**（公告链接 / 截图 / 实测页面），解析器类 PR 请附上脱敏后的样例 HTML（放进 `fixtures/`）。
 4. **CI 自动把关**：`.github/workflows/validate.yml` 在 `ubuntu-latest` + Node 24 上跑 `validate` → `test` → `snapshot` → 生成物未变 → `sandbox:demo`，结论写进 PR 的 Step Summary。
@@ -336,6 +342,25 @@ npm run sandbox:demo  # 沙箱演示：正常解析器成功 + 越权/动态代�
 SOURCE_DATE_EPOCH=1767225600 npm run snapshot
 git status --short snapshot   # 应为空
 ```
+
+---
+
+## 遇到问题 / 想贡献
+
+不确定该走哪条路时按下表选（两个模板都在 `.github/ISSUE_TEMPLATE/`，也可以在 **New issue** 页面直接挑）：
+
+| 你的情况 | 去哪 |
+| --- | --- |
+| 学校**还没有**适配器，或想补充学校信息（教务系统 / 作息时间） | [请求适配学校 / 提交学校信息](https://github.com/muyangplus/dawn-tick-presets/issues/new?template=request-school.yml&title=%5B%E5%AD%A6%E6%A0%A1%5D+) |
+| 学校**已适配**，但登录页打不开 / 识别不到课表 / 解析缺课或时间错 | [适配失效 / 解析出错](https://github.com/muyangplus/dawn-tick-presets/issues/new?template=report-adapter-broken.yml&title=%5B%E5%A4%B1%E6%95%88%5D+) |
+| 想直接改 `school.json` / `system.json` / `parse.js` 提 PR | 见上面的[能贡献什么](#能贡献什么)与[审核流程](#审核流程) |
+
+- **标签用途**：`request-school.yml` 会自动打 `school-request`（学校适配请求，按校名统计需求），
+  `report-adapter-broken.yml` 会自动打 `adapter-broken`（已有适配器失效，优先修正确性）。
+  维护者按这两个标签筛选与排期，**请不要手动改动这两个标签**。
+- 提 issue **不要求你会写代码**：模板里的「需要指导」就是让我们在 issue 里一步步教你怎么取页面样本 / 作息数据。
+- 两种模板都**严禁粘贴教务系统账号、密码、Cookie、真实学号姓名**；页面样本必须脱敏（规则见 [sandbox/adapter-contract.md](sandbox/adapter-contract.md)）。
+- 只要标签里的学校**还没有** `presets/schools/<school-id>/school.json`（有真实作息数据），就属于「请求适配」，别开成「失效」。
 
 ---
 

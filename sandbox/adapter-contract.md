@@ -176,6 +176,10 @@ export function parse({ html, url, hints }) {
 - `expect.events` 是给人看的完整期望，也是沙箱逐条比对的基准；
 - HTML 请**脱敏**：删掉学号、姓名、Cookie、真实 token，只保留结构。
 
+> 解析器在真实页面上失效（识别不到课表 / 缺课 / 时间错）时，不用先自己写代码：
+> 提 [适配失效 / 解析出错](https://github.com/muyangplus/dawn-tick-presets/issues/new?template=report-adapter-broken.yml) issue 并附上脱敏后的页面 HTML 即可，
+> 不知道怎么取样本就选「暂时不能」，我们会在 issue 里指导。判定口径见 [README · 遇到问题 / 想贡献](../README.md#遇到问题--想贡献)。
+
 ### 本地自查
 
 ```bash
