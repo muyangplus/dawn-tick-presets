@@ -1,0 +1,12 @@
+{
+  "id": "other",
+  "name": "其他教务",
+  "entryPath": "/",
+  "hint": "自行登录后打开课表页",
+  "detect": {
+    "markers": [],
+    "timetableTableIds": [],
+    "timetableTableClasses": [],
+    "gridCellIdPatterns": []
+  }
+}

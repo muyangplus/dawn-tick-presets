@@ -1,0 +1,12 @@
+{
+  "id": "jwglxt",
+  "name": "正方教务",
+  "entryPath": "/jwglxt/xtgl/login_slogin.html",
+  "hint": "个人课表查询在「信息查询 → 学生课表查询」",
+  "detect": {
+    "markers": ["jwglxt", "xskb_list", "timetable_con", "kbgrid_table"],
+    "timetableTableIds": ["kbtable"],
+    "timetableTableClasses": ["kb", "timetable", "schedule", "skb"],
+    "gridCellIdPatterns": ["\\d{1,2}[-_]\\d{1,2}"]
+  }
+}
