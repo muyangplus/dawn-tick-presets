@@ -21,7 +21,7 @@
   │  execFile(node, [
   │      '--permission',                              ← Node 权限模型
   │      '--disallow-code-generation-from-strings',   ← 禁 eval / new Function
-  │      '--allow-fs-read=<presets/systems/<id>>',    ← 只读白名单（仅该系统目录）
+  │      '--allow-fs-read=<解析器所在目录>',           ← 只读白名单（学校级或系统级目录，只有一个）
   │      <sandbox-run.mjs> '--sandbox-child' <parse.js 路径> ← 双角色文件
   │  ], { timeout: <墙钟上限>, stdio: 'pipe', env: 白名单 })
   │
@@ -29,7 +29,7 @@
   │  ── stdout：{ ok, events?, error? }（必须是 JSON）
   ▼
 子进程（沙箱内）
-  ├─ 按 `import()` 加载解析器（读权限仅覆盖该系统目录）
+  ├─ 按 `import()` 加载解析器（读权限仅覆盖该解析器所在目录）
   ├─ 调用 parse(frozenCtx)
   └─ 同步校验返回结构 → 写 JSON → 退出
 ```
@@ -95,6 +95,10 @@ node --permission --disallow-code-generation-from-strings \
 JSON
 ```
 
+学校级解析器同理，路径换成 `presets/schools/<校目录>/parse.js`（`--allow-fs-read` 也换成该学校目录）：
+**学校级优先于系统级**，两者都存在时该校用学校级（见 [adapter-contract.md](adapter-contract.md) 第 0 节）。
+
 测试夹具（`test/fixtures/`）里的 `evil-adapter.js`、`codegen-adapter.js`、`hang-adapter.js`
-**只在 demo 与测试中使用**，绝不会被放进 `presets/systems/*/parse.js`（`validate` 只扫描后者）。
-系统自己的夹具放在 `presets/systems/<id>/fixtures/`，是**数据**（页面样本 + 期望事件），不是可执行代码。
+**只在 demo 与测试中使用**，不进入 `presets/**/parse.js`（`validate` 只扫描后者）。
+解析器自己的夹具放在 `presets/systems/<id>/fixtures/` 或 `presets/schools/<dir>/fixtures/`，
+是**数据**（页面样本 + 期望事件），不是可执行代码。

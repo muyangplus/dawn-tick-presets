@@ -1,5 +1,5 @@
 /**
- * legacy.mjs —— 把新目录结构（systems/<id>/meta.json + login.json）编译成
+ * legacy.mjs —— 把作者结构（合并后的 `systems/<id>/system.json`）编译成
  * **旧扁平结构**的系统配置对象。
  *
  * 为什么需要它：分发格式（`snapshot/presets-<version>.json`）必须保持不变，
@@ -8,9 +8,10 @@
  *   { id, name, entryPath, hint, detect: { markers, timetableTableIds,
  *     timetableTableClasses, gridCellIdPatterns } }
  *
- * 作者结构把「系统元数据」与「登录入口」拆成了两个文件，编译期再把它们合并回来，
- * 合并规则固定为 **meta 在前、login 在后**，键序固定为旧文件的历史顺序，
- * 因此对未改动的系统，编译产物与旧文件**逐字节一致、sha256 也一致**。
+ * 历史沿革：这份数据最初是一个扁平文件 `presets/systems/<id>.json`，随后被拆成
+ * `meta.json` + `login.json` 两个文件，现在又合并成 `system.json` 一个文件。
+ * 无论形态怎么变，编译规则固定（键序为旧文件的历史顺序），
+ * 因此对未改动的系统，编译产物与最开始的旧文件**逐字节一致、sha256 也一致**。
  */
 
 import { readFileSync } from 'node:fs';
@@ -40,42 +41,44 @@ export function stringifyLegacy(value, depth = 0) {
 }
 
 /**
- * 把 meta.json + login.json 编译成旧扁平结构对象（键序按 LEGACY_SYSTEM_KEY_ORDER）。
- * @param {{ meta: object, login: object }} input
+ * 把合并后的 system.json 文档（{ id, name?, version?, aliases?, detect, login }）
+ * 编译成旧扁平结构对象（键序按 LEGACY_SYSTEM_KEY_ORDER）。
+ *
+ * 合并前这份数据来自 meta.json + login.json 两个文件；合并后来自同一个 system.json，
+ * 但字段语义完全不变，因此编译产物（以及分发给客户端的哈希）逐字节不变。
+ * @param {{ id: string, name?: string, detect?: object, login?: object }} doc
  */
-export function compileSystemConfig({ meta, login }) {
+export function compileSystemConfig(doc) {
   const detect = {};
-  for (const key of DETECT_KEY_ORDER) detect[key] = meta.detect?.[key] ?? [];
+  for (const key of DETECT_KEY_ORDER) detect[key] = doc.detect?.[key] ?? [];
   return {
-    id: meta.id,
-    name: meta.name,
-    entryPath: login.entryPath,
-    hint: login.hint,
+    id: doc.id,
+    name: doc.name,
+    entryPath: doc.login?.entryPath,
+    hint: doc.login?.hint,
     detect,
   };
 }
 
 /**
  * 编译成「旧文件文本」，用于计算与旧快照完全一致的内容哈希。
- * @param {{ meta: object, login: object }} input
+ * @param {{ id: string, name?: string, detect?: object, login?: object }} doc
  */
-export function compileSystemConfigText({ meta, login }) {
-  const value = compileSystemConfig({ meta, login });
+export function compileSystemConfigText(doc) {
+  const value = compileSystemConfig(doc);
   const ordered = {};
   for (const key of LEGACY_SYSTEM_KEY_ORDER) ordered[key] = value[key];
   return `${stringifyLegacy(ordered)}\n`;
 }
 
 /**
- * 直接从仓库读一个系统并编译。
+ * 直接从仓库读一个系统并编译（合并后的 system.json）。
  * @param {string} root 仓库根
  * @param {string} id 系统 id（= presets/systems/<id>/ 目录名）
  */
 export function compileSystemFromRepo(root, id) {
-  const dir = join(root, 'presets', 'systems', id);
-  const meta = JSON.parse(readFileSync(join(dir, 'meta.json'), 'utf8'));
-  const login = JSON.parse(readFileSync(join(dir, 'login.json'), 'utf8'));
-  return { value: compileSystemConfig({ meta, login }), text: compileSystemConfigText({ meta, login }) };
+  const doc = JSON.parse(readFileSync(join(root, 'presets', 'systems', id, 'system.json'), 'utf8'));
+  return { value: compileSystemConfig(doc), text: compileSystemConfigText(doc) };
 }
 
 /**

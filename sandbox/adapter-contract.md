@@ -1,9 +1,25 @@
-# 解析器接口契约（`presets/systems/<system-id>/parse.js`）
+# 解析器接口契约（`presets/systems/<system-id>/parse.js` 与 `presets/schools/<school-id>/parse.js`）
 
 解析器负责把某个教务系统课表页面的 **HTML** 变成晓刻能用的**事件列表**。
 因为它是「外部贡献的、会被执行的代码」，所以它的运行环境是受限沙箱，接口也被刻意收窄。
 
 > 先读 [README.md](README.md) 了解沙箱的运行约束与拦截结果。
+
+---
+
+## 0. 两个挂载点与优先级
+
+解析器可以放在两个地方，**接口完全相同**：
+
+| 位置 | 作用范围 | 何时用 |
+| --- | --- | --- |
+| `presets/systems/<system-id>/parse.js` | 该教务系统的**所有**学校 | 大多数系统通用（默认选择） |
+| `presets/schools/<school-id>/parse.js` | **仅**这一所学校 | 某校页面结构被魔改，系统级解析器搞不定 |
+
+**优先级：学校级 ＞ 系统级。** 两者都存在时，该校用学校级解析器；系统级解析器继续服务其他学校。
+校验报告里有一条 `D3. 解析器优先级（学校级 > 系统级）` 会把这个判断显式打出来。
+
+同一个目录里**只允许一个 `parse.js`**（出现第二个 `.js` 会直接校验失败）。
 
 ---
 
@@ -29,7 +45,7 @@ export function parse({ html, url, hints }) {
 | --- | --- | --- |
 | `html` | `string` | 课表页面的 HTML（已登录后的页面）。**只读**，不要试图改写它。 |
 | `url` | `string` | 页面 URL，用于区分同一系统的不同入口。 |
-| `hints` | `object` | 来自 `presets/systems/<id>/meta.json` 的 `detect` 提示（表格 id / class / 格子 id 正则等）。可能为空对象。 |
+| `hints` | `object` | 来自 `systems/<id>/system.json` 的 `detect` 提示（表格 id / class / 格子 id 正则等）。可能为空对象。 |
 
 入参在沙箱里被 `Object.freeze`，写入不会生效。
 
@@ -64,6 +80,7 @@ export function parse({ html, url, hints }) {
 | `while(true)`、`setInterval(` | 禁止死循环 / 无限定时器 |
 
 扫描前会**忽略注释**（注释内的词不计入命中），命中会报出**文件与行号**。
+扫描覆盖 `systems/*/parse.js` **与** `schools/*/parse.js`。
 
 > 解析器 PR 需要**人工逐行复核**；运行期约束见第 3 节。
 
@@ -76,7 +93,7 @@ export function parse({ html, url, hints }) {
 | 约束项 | 取值方式 | 说明 |
 | --- | --- | --- |
 | 权限模型 | `node --permission` | Node 24 的权限系统 |
-| 文件读取 | `--allow-fs-read=<系统目录>` | 只读白名单，只放开 `presets/systems/<id>/` |
+| 文件读取 | `--allow-fs-read=<解析器所在目录>` | 只读白名单，只放开那一个目录 |
 | 文件写入 | ❌ 拒绝 | 不传 `--allow-fs-write` |
 | 子进程 | ❌ 拒绝 | 不传 `--allow-child-process` |
 | worker_threads | ❌ 拒绝 | 不传 `--allow-worker` |
@@ -119,13 +136,13 @@ export function parse({ html, url, hints }) {
 
 - **只用正则和字符串处理**（沙箱里没有 DOM，也拿不到任何库）。
 - 循环务必有界：`while (match !== null)` + `re.exec` 会自然收敛；不要写 `while (true)`。
-- `hints` 里可能带着 `presets/systems/<id>/meta.json` 的 `detect` 提示，优先用它，别硬编码。
+- `hints` 里可能带着 `systems/<id>/system.json` 的 `detect` 提示，优先使用它，避免硬编码。
 - 单个格子里多条课程（换行分隔）需自行切分。
 - 数量级目标：1000 行以内的 HTML 应在几十毫秒内解析完。
 
 ### 必须附带夹具（硬规则）
 
-只要 `presets/systems/<id>/parse.js` 存在，同目录的 `fixtures/` 就**必须**至少包含：
+只要某个目录下有 `parse.js`，**同目录**的 `fixtures/` 就必须至少包含：
 
 1. 页面样本：`sample-page.html`（脱敏后的真实课表页）；
 2. 期望事件：`expected-events.json`：
@@ -149,8 +166,12 @@ export function parse({ html, url, hints }) {
 }
 ```
 
-- `fixtures/` 缺失或为空 → **`npm run validate` 直接失败**（这是本次结构调整的主要收益）；
-- `npm run validate` 会在沙箱里用 `sample-page.html` 真跑一遍 `parse.js`，产出事件必须与
+- 字段约束：`id` / `system` / `adapter` / `fixtures` / `input` / `expect` 必填；`school` 可选。
+  用例的形状定义在 `scripts/validate.mjs` 的 `FIXTURE_CASE_SCHEMA`（随校验器一起版本化，不再单独占一个 schema 文件）。
+- 系统级用例（`systems/<id>/fixtures/`）的 `system` 必须等于目录名；
+  学校级用例（`schools/<dir>/fixtures/`）的 `system` 必须等于该校 `school.json` 的 `system`。
+- **`fixtures/` 缺失或为空 → `npm run validate` 直接失败**（学校级与系统级一视同仁）；
+- `npm run validate` 会在沙箱里用 `sample-page.html` 执行一次对应的 `parse.js`，产出事件必须与
   `expected-events.json` 里的 `expect.events` **逐条一致**；`expect.minEvents` 是最低条数门槛；
 - `expect.events` 是给人看的完整期望，也是沙箱逐条比对的基准；
 - HTML 请**脱敏**：删掉学号、姓名、Cookie、真实 token，只保留结构。
@@ -171,3 +192,5 @@ node --permission --disallow-code-generation-from-strings \
      scripts/sandbox-run.mjs --sandbox-child presets/systems/jwglxt/parse.js \
   <<< '{"html":"<table id=\"kbtable\"><tr><td id=\"1-2\">高数<br>张伟 老师<br>A101</td></tr></table>","url":"https://jwgl.usts.edu.cn/","hints":{}}'
 ```
+
+学校级解析器把路径换成 `presets/schools/usts/parse.js`（`--allow-fs-read` 也换成对应目录）即可。
