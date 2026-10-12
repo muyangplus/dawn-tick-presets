@@ -1,8 +1,0 @@
-{
-  "id": "default",
-  "name": "通用作息",
-  "type": "generic",
-  "generic": true,
-  "system": null,
-  "aliases": ["默认作息"]
-}

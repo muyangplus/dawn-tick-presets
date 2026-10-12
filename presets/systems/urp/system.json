@@ -15,5 +15,9 @@
     "timetableTableIds": [],
     "timetableTableClasses": [],
     "gridCellIdPatterns": []
+  },
+  "login": {
+    "entryPath": "/",
+    "hint": "综合教务系统，课表在「课表查询」"
   }
 }

@@ -1,0 +1,120 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dawn-tick.dev/schema/school.schema.json",
+  "title": "DawnTick 学校配置（presets/schools/<dir>/school.json）",
+  "description": "学校条目的**唯一**配置文件：把原 meta.json（身份）+ timetable.json（作息）+ config.json（对系统的覆盖）合并成一个文件。身份字段（id/name/name 别名/地区/类型/系统引用）平铺在顶层，作息表放在 timetable 键，覆盖字段（login/params/detect）同样平铺在顶层。未知顶层键一律校验失败。",
+  "type": "object",
+  "required": ["id", "name", "system", "timetable"],
+  "$defs": {
+    "periods": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 24,
+      "description": "节次列表，必须按 periodNo 严格递增、从 1 起连续且不重叠。",
+      "items": {
+        "type": "object",
+        "required": ["periodNo", "start", "end"],
+        "properties": {
+          "periodNo": { "type": "integer", "minimum": 1, "maximum": 24 },
+          "start": { "type": "string", "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$" },
+          "end": { "type": "string", "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "loginOverride": {
+      "type": "object",
+      "description": "覆盖该系统 system.json 里 login.entryPath / login.hint（未写的字段沿用系统级值）。",
+      "properties": {
+        "entryPath": { "type": "string", "pattern": "^/" },
+        "hint": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "detectOverride": {
+      "type": "object",
+      "description": "仅允许**追加** markers / timetableTableIds / timetableTableClasses；不允许写 gridCellIdPatterns，也不允许删除系统级特征（合并是并集）。",
+      "properties": {
+        "markers": {
+          "type": "array",
+          "maxItems": 64,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "timetableTableIds": {
+          "type": "array",
+          "maxItems": 64,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "timetableTableClasses": {
+          "type": "array",
+          "maxItems": 64,
+          "items": { "type": "string", "minLength": 1 }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[a-z][a-z0-9_-]*$",
+      "description": "学校稳定标识（如 usts / default）。_default 目录的 id 必须是 default。"
+    },
+    "name": { "type": "string", "minLength": 1, "description": "中文展示名。" },
+    "shortName": { "type": "string", "minLength": 1, "description": "中文简称（可选）。" },
+    "region": { "type": "string", "minLength": 1, "description": "省份 / 地区（可选），如「江苏」。历史字段，保留兼容。" },
+    "province": { "type": "string", "minLength": 1, "description": "省份（可选），如「江苏」。" },
+    "city": { "type": "string", "minLength": 1, "description": "城市（可选），如「苏州」。" },
+    "tags": {
+      "type": "array",
+      "maxItems": 32,
+      "items": { "type": "string", "minLength": 1 },
+      "description": "搜索 / 分类标签（可选）。"
+    },
+    "type": { "type": "string", "minLength": 1, "description": "学校类型，如 university / college / generic。" },
+    "system": {
+      "type": ["string", "null"],
+      "pattern": "^[a-z][a-z0-9_-]*$",
+      "description": "引用的教务系统 id，必须在 presets/systems/<id>/ 下存在；null 表示不绑定（如通用作息）。"
+    },
+    "aliases": {
+      "type": "array",
+      "maxItems": 32,
+      "items": { "type": "string", "minLength": 1 },
+      "description": "搜索用别名 / 简称。"
+    },
+    "generic": {
+      "type": "boolean",
+      "description": "true 表示这是「通用作息」而非某所真实学校。"
+    },
+    "login": { "$ref": "#/$defs/loginOverride" },
+    "params": {
+      "type": "object",
+      "description": "附加到登录入口 query 的字符串键值对（如 { \"gnmkdm\": \"N2151\" }）。",
+      "additionalProperties": { "type": "string" }
+    },
+    "detect": { "$ref": "#/$defs/detectOverride" },
+    "timetable": {
+      "type": "object",
+      "description": "该校作息时间表（原 timetable.json 的内容，逐字段不变）。",
+      "required": ["id", "name", "periods"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[a-z][a-z0-9_-]*$",
+          "description": "作息表稳定 id，必须与学校 id 相同（_default 目录的 id 是 default）。"
+        },
+        "name": { "type": "string", "minLength": 1, "description": "展示名。" },
+        "source": {
+          "type": "string",
+          "description": "来源说明：学校教务处公告 / 官网链接 / 用户提供截图。"
+        },
+        "periods": { "$ref": "#/$defs/periods" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

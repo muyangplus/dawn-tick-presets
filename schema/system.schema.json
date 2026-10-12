@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dawn-tick.dev/schema/system.schema.json",
+  "title": "DawnTick 教务系统配置（presets/systems/<id>/system.json）",
+  "description": "教务系统的**唯一**配置文件：把原 meta.json（元数据 + 识别特征）与 login.json（登录入口）合并成一个文件。id 必须与目录名一致且属于主项目约定的系统 id 集合。解析器在 parse.js，夹具在 fixtures/。",
+  "type": "object",
+  "required": ["id", "name", "detect", "login"],
+  "$defs": {
+    "detect": {
+      "type": "object",
+      "required": ["markers", "timetableTableIds", "timetableTableClasses", "gridCellIdPatterns"],
+      "properties": {
+        "markers": {
+          "type": "array",
+          "maxItems": 64,
+          "items": { "type": "string", "minLength": 1 },
+          "description": "页面特征字符串（同时作为合法正则校验）。"
+        },
+        "timetableTableIds": {
+          "type": "array",
+          "maxItems": 64,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "timetableTableClasses": {
+          "type": "array",
+          "maxItems": 64,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "gridCellIdPatterns": {
+          "type": "array",
+          "maxItems": 32,
+          "items": { "type": "string", "minLength": 1 },
+          "description": "合法正则字符串，必须能被 new RegExp 编译。"
+        }
+      },
+      "additionalProperties": false
+    },
+    "login": {
+      "type": "object",
+      "required": ["entryPath", "hint"],
+      "properties": {
+        "entryPath": {
+          "type": "string",
+          "pattern": "^/",
+          "description": "登录入口路径，必须以 / 开头，不能带协议或域名。"
+        },
+        "hint": { "type": "string", "minLength": 1, "description": "给用户的操作提示。" },
+        "fields": {
+          "type": "object",
+          "description": "可选：登录表单字段名映射（字符串键值）。",
+          "additionalProperties": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[a-z][a-z0-9_-]*$",
+      "description": "系统 id，必须与目录名一致，且属于主项目约定的系统 id 集合。"
+    },
+    "name": { "type": "string", "minLength": 1, "description": "展示名，如「正方教务」。" },
+    "version": {
+      "type": "string",
+      "minLength": 1,
+      "description": "该系统配置 / 解析器自身的版本号（可省略）。"
+    },
+    "aliases": {
+      "type": "array",
+      "maxItems": 32,
+      "items": { "type": "string", "minLength": 1 },
+      "description": "识别 / 搜索用别名。"
+    },
+    "detect": { "$ref": "#/$defs/detect" },
+    "login": { "$ref": "#/$defs/login" }
+  },
+  "additionalProperties": false
+}

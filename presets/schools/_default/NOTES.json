@@ -1,0 +1,3 @@
+{
+  "note": "通用作息：school.json 里的 system 为 null（不绑定教务系统），generic 为 true。快照的 index.schools 里会把它标成 default: true。"
+}

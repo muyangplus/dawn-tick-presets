@@ -15,5 +15,9 @@
     "timetableTableIds": [],
     "timetableTableClasses": [],
     "gridCellIdPatterns": []
+  },
+  "login": {
+    "entryPath": "/jsxsd/",
+    "hint": "课表在「培养管理 → 我的课表」"
   }
 }

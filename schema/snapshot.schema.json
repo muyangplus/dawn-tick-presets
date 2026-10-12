@@ -1,0 +1,109 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dawn-tick.dev/schema/snapshot.schema.json",
+  "title": "DawnTick 预设快照（snapshot/presets-<version>.json）",
+  "description": "仓库的**唯一**生成物，由 scripts/snapshot.mjs 写出：既保留主项目客户端消费的旧字段结构（version / schemaVersion / generatedAt / sources / hash，逐字段未变），又新增 index 字段承载原 presets/index.json 的全部信息（学校索引 + 系统引用）。客户端忽略未知键，因此新增 index 不破坏兼容。",
+  "type": "object",
+  "required": ["version", "schemaVersion", "generatedAt", "sources", "index", "hash"],
+  "$defs": {
+    "timetableEntry": {
+      "type": "object",
+      "required": ["id", "path", "sha256"],
+      "description": "一条作息表来源。id 是作息表 id（学校 id），path 是学校配置文件路径，sha256 是**原始作息 JSON 文本**的内容哈希（合并进 school.json 前的字节不变，哈希也逐字节不变）。",
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "path": { "type": "string", "minLength": 1 },
+        "sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+      },
+      "additionalProperties": false
+    },
+    "systemEntry": {
+      "type": "object",
+      "required": ["id", "path", "sha256"],
+      "description": "一条教务系统来源。path 是**符号路径** presets/systems/<id>/system.json（历史契约，保持旧形状）；sha256 是 system.json 按旧扁平结构编译出的文本哈希。",
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "path": { "type": "string", "minLength": 1 },
+        "sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+      },
+      "additionalProperties": false
+    },
+    "schoolIndexEntry": {
+      "type": "object",
+      "required": ["id", "name", "system", "configPath", "timetablePath", "generic", "default"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z][a-z0-9_-]*$" },
+        "name": { "type": "string", "minLength": 1 },
+        "region": { "type": "string", "minLength": 1 },
+        "type": { "type": "string", "minLength": 1 },
+        "system": { "type": ["string", "null"] },
+        "aliases": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "generic": { "type": "boolean" },
+        "default": { "type": "boolean", "description": "true 表示没有专属作息时使用的通用作息。" },
+        "configPath": {
+          "type": ["string", "null"],
+          "description": "该校覆盖配置的路径，合并后就是 presets/schools/<dir>/school.json；没有任何覆盖（login/params/detect/config-system）时为 null。"
+        },
+        "timetablePath": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "systemIndexEntry": {
+      "type": "object",
+      "required": ["id", "name", "hasParser", "metaPath", "loginPath", "detect"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z][a-z0-9_-]*$" },
+        "name": { "type": "string", "minLength": 1 },
+        "version": { "type": "string", "minLength": 1 },
+        "aliases": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "hasParser": { "type": "boolean", "description": "是否存在 parse.js。" },
+        "parserPath": { "type": "string", "minLength": 1 },
+        "metaPath": { "type": "string", "minLength": 1, "description": "合并后指向 presets/systems/<id>/system.json（原 meta.json 的键名保留，避免消费方 breaking）。" },
+        "loginPath": { "type": "string", "minLength": 1, "description": "合并后指向 presets/systems/<id>/system.json（原 login.json 的键名保留）。" },
+        "detect": { "type": "object" },
+        "entryPath": { "type": "string", "minLength": 1 },
+        "hint": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    }
+  },
+  "properties": {
+    "version": { "type": "string", "minLength": 1, "description": "与 version.json 的 version 一致。" },
+    "schemaVersion": { "type": "integer", "minimum": 1, "description": "与 version.json 的 schemaVersion 一致。" },
+    "generatedAt": { "type": "string", "minLength": 1, "description": "生成时间（--at > SOURCE_DATE_EPOCH > 当前时间）。" },
+    "sources": {
+      "type": "object",
+      "required": ["timetables", "systems", "adapters"],
+      "additionalProperties": false,
+      "properties": {
+        "timetables": { "type": "array", "items": { "$ref": "#/$defs/timetableEntry" } },
+        "systems": { "type": "array", "items": { "$ref": "#/$defs/systemEntry" } },
+        "adapters": {
+          "type": "object",
+          "description": "解析器文件哈希：系统解析器键名为 <系统id>.js，学校解析器键名为 <学校id>.js（解析器优先级：学校级 > 系统级）。",
+          "additionalProperties": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+        }
+      }
+    },
+    "index": {
+      "type": "object",
+      "description": "原 presets/index.json 的全部信息（本仓库不再单独产出一个 index.json 文件）。",
+      "required": ["_generated", "version", "schemaVersion", "generatedAt", "schools", "systems"],
+      "additionalProperties": false,
+      "properties": {
+        "_generated": { "const": true, "description": "恒为 true：本字段由脚本生成，手改会被 CI 的 git diff 检查抓到。" },
+        "version": { "type": "string", "minLength": 1 },
+        "schemaVersion": { "type": "integer", "minimum": 1 },
+        "generatedAt": { "type": "string", "minLength": 1 },
+        "schools": { "type": "array", "items": { "$ref": "#/$defs/schoolIndexEntry" } },
+        "systems": { "type": "array", "items": { "$ref": "#/$defs/systemIndexEntry" } }
+      }
+    },
+    "hash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "description": "对「去掉 hash 字段后的整个快照」——**包含新增的 index 字段**——做规范化 JSON（对象键排序、无多余空白）后的 sha256。"
+    }
+  },
+  "additionalProperties": false
+}

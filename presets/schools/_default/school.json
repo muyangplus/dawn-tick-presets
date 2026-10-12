@@ -1,0 +1,27 @@
+{
+  "id": "default",
+  "name": "通用作息",
+  "type": "generic",
+  "generic": true,
+  "system": null,
+  "aliases": ["默认作息"],
+  "timetable": {
+    "id": "default",
+    "name": "通用作息",
+    "source": "内置默认：08:00 起 12 节，每节 45 分钟、课间 10 分钟（没有特定学校时使用）",
+    "periods": [
+      { "periodNo": 1, "start": "08:00", "end": "08:45" },
+      { "periodNo": 2, "start": "08:55", "end": "09:40" },
+      { "periodNo": 3, "start": "09:50", "end": "10:35" },
+      { "periodNo": 4, "start": "10:45", "end": "11:30" },
+      { "periodNo": 5, "start": "11:40", "end": "12:25" },
+      { "periodNo": 6, "start": "12:35", "end": "13:20" },
+      { "periodNo": 7, "start": "13:30", "end": "14:15" },
+      { "periodNo": 8, "start": "14:25", "end": "15:10" },
+      { "periodNo": 9, "start": "15:20", "end": "16:05" },
+      { "periodNo": 10, "start": "16:15", "end": "17:00" },
+      { "periodNo": 11, "start": "17:10", "end": "17:55" },
+      { "periodNo": 12, "start": "18:05", "end": "18:50" }
+    ]
+  }
+}
