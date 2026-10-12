@@ -1,0 +1,87 @@
+name: validate
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# SOURCE_DATE_EPOCH 固定为 2026-01-01T00:00:00Z，保证快照可复现，
+# 从而让 `git diff --exit-code snapshot` 能稳定判断「内容是否变了」。
+env:
+  SOURCE_DATE_EPOCH: '1767225600'
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: 校验 / 测试 / 快照 / 沙箱冒烟
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: 打印运行环境
+        run: |
+          node --version
+          npm --version
+          echo "SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH"
+
+      - name: 全量校验（schema + 语义 + 一致性 + 安全扫描 + 沙箱冒烟）
+        id: validate
+        run: npm run validate
+
+      - name: 单元测试（node --test）
+        id: test
+        run: npm test
+
+      - name: 生成快照
+        id: snapshot
+        run: npm run snapshot
+
+      - name: 校验快照内容哈希未变
+        id: hashcheck
+        run: |
+          if ! git diff --quiet -- snapshot; then
+            echo '### ❌ 快照与提交内容不一致' >> "$GITHUB_STEP_SUMMARY"
+            echo '' >> "$GITHUB_STEP_SUMMARY"
+            echo '内容变了但 `snapshot/presets-<version>.json` 没重新生成（或忘了提交）。' >> "$GITHUB_STEP_SUMMARY"
+            echo '请在本地跑 `npm run snapshot` 后一起提交。' >> "$GITHUB_STEP_SUMMARY"
+            echo '' >> "$GITHUB_STEP_SUMMARY"
+            echo '```diff' >> "$GITHUB_STEP_SUMMARY"
+            git diff -- snapshot >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          echo '快照与提交内容一致 ✓'
+
+      - name: 沙箱冒烟演示（正常适配器成功 + 越权/动态代码/死循环被拦截）
+        id: demo
+        run: npm run sandbox:demo
+
+      - name: 写入校验结论到 PR Summary
+        if: always()
+        run: |
+          {
+            echo ''
+            echo '## 校验结论'
+            echo ''
+            echo '| 步骤 | 结果 |'
+            echo '| --- | --- |'
+            echo "| Node 版本 | \`$(node --version)\` |"
+            echo "| \`npm run validate\` | ${{ steps.validate.conclusion == 'success' && '✅ 通过' || '❌ 失败' }} |"
+            echo "| \`npm test\` | ${{ steps.test.conclusion == 'success' && '✅ 通过' || '❌ 失败' }} |"
+            echo "| \`npm run snapshot\` | ${{ steps.snapshot.conclusion == 'success' && '✅ 通过' || '❌ 失败' }} |"
+            echo "| 快照哈希未变 | ${{ steps.hashcheck.conclusion == 'success' && '✅ 一致' || '❌ 不一致' }} |"
+            echo "| \`npm run sandbox:demo\` | ${{ steps.demo.conclusion == 'success' && '✅ 通过' || '❌ 失败' }} |"
+            echo ''
+            echo '> 沙箱为**受限子进程**（Node 权限模型 + 资源上限 + 代码生成开关）；'
+            echo '> 威胁模型与拦截结果见 `sandbox/README.md`。'
+          } >> "$GITHUB_STEP_SUMMARY"

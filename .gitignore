@@ -1,0 +1,10 @@
+node_modules/
+*.log
+.DS_Store
+Thumbs.db
+
+# 本地验收输出（不入库）
+.acceptance/
+
+# 本地内部记录（不入库）
+.notes/

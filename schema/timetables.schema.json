@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dawn-tick.dev/schema/timetables.schema.json",
+  "title": "DawnTick 作息时间表",
+  "description": "学校作息时间表。仓库内每个文件描述一张表，文件名必须与 id 一致。",
+  "type": "object",
+  "required": ["id", "name", "periods"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[a-z][a-z0-9_-]*$",
+      "description": "小写稳定标识，必须与文件名一致（如 usts.json → usts）。"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "中文展示名，如「苏州科技大学」。"
+    },
+    "source": {
+      "type": "string",
+      "description": "来源说明，建议写明「学校教务处公告」「官网链接」或「用户提供截图」。"
+    },
+    "periods": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 24,
+      "description": "节次列表，必须按 periodNo 严格递增且不重叠。",
+      "items": {
+        "type": "object",
+        "required": ["periodNo", "start", "end"],
+        "properties": {
+          "periodNo": { "type": "integer", "minimum": 1, "maximum": 24 },
+          "start": { "type": "string", "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$" },
+          "end": { "type": "string", "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$" }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

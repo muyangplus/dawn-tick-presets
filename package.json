@@ -1,0 +1,17 @@
+{
+  "name": "dawn-tick-presets",
+  "private": true,
+  "type": "module",
+  "version": "1.0.0",
+  "description": "晓刻 DawnTick 外部可贡献配置仓库：教务系统识别规则、学校作息时间表、受限沙箱适配器",
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "validate": "node scripts/validate.mjs",
+    "test": "node --test test/validate.test.mjs",
+    "snapshot": "node scripts/snapshot.mjs",
+    "sandbox:demo": "node scripts/sandbox-run.mjs --demo"
+  }
+}

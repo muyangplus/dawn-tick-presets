@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dawn-tick.dev/schema/conformance.schema.json",
+  "title": "DawnTick 适配器自检用例",
+  "description": "适配器一致性用例：给定 HTML 片段与提示，适配器必须产出可预期的课表事件。",
+  "type": "object",
+  "required": ["id", "system", "adapter", "input", "expect"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[a-z][a-z0-9_-]*$",
+      "description": "用例 id，建议与文件名一致。"
+    },
+    "system": {
+      "type": "string",
+      "enum": ["jwglxt", "qzdatasource", "urp", "other"],
+      "description": "该用例针对的教务系统 id。"
+    },
+    "adapter": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_-]*\\.js$",
+      "description": "适配器文件名，位于 presets/adapters/ 下。"
+    },
+    "input": {
+      "type": "object",
+      "required": ["html", "url", "hints"],
+      "properties": {
+        "html": { "type": "string" },
+        "url": { "type": "string", "pattern": "^https?://" },
+        "hints": { "type": "object" }
+      },
+      "additionalProperties": false
+    },
+    "expect": {
+      "type": "object",
+      "required": ["minEvents"],
+      "properties": {
+        "minEvents": { "type": "integer", "minimum": 0 },
+        "maxEvents": { "type": "integer", "minimum": 0 },
+        "events": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["title", "dayOfWeek", "periodStart", "periodEnd"],
+            "properties": {
+              "title": { "type": "string", "minLength": 1 },
+              "dayOfWeek": { "type": "integer", "minimum": 1, "maximum": 7 },
+              "periodStart": { "type": "integer", "minimum": 1, "maximum": 24 },
+              "periodEnd": { "type": "integer", "minimum": 1, "maximum": 24 },
+              "room": { "type": "string" },
+              "teacher": { "type": "string" },
+              "weeks": { "type": "array", "items": { "type": "integer", "minimum": 1 } }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}
