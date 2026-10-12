@@ -648,7 +648,7 @@ export function checkSystems(root, report) {
  * 一致性用例的内联 JSON Schema（原 schema/system-fixture.schema.json）。
  *
  * schema/ 已从 7 个收敛到 3 个（school / system / snapshot），用例形状随校验器一起版本化，
- * 因此改用内联常量：改用例形状 = 改校验器，评审时看同一个文件即可。
+ * 改用例形状 = 改校验器，评审时看同一个文件即可。
  */
 export const FIXTURE_CASE_SCHEMA = {
   type: 'object',
@@ -1298,7 +1298,7 @@ export async function main(argv = process.argv.slice(2)) {
   checkVersion(root, report);
   if (options.scanOnly) {
     const section = report.section('D2. 解析器沙箱冒烟（受限子进程）');
-    section.info('已通过 --scan-only 跳过');
+    section.info('--scan-only，跳过该步');
   } else {
     await checkAdapterSandbox(root, report, systems, cases, adapterFiles, schools);
   }

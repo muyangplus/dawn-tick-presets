@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://dawn-tick.dev/schema/snapshot.schema.json",
   "title": "DawnTick 预设快照（snapshot/presets-<version>.json）",
-  "description": "仓库的**唯一**生成物，由 scripts/snapshot.mjs 写出：既保留主项目客户端消费的旧字段结构（version / schemaVersion / generatedAt / sources / hash，逐字段未变），又新增 index 字段承载原 presets/index.json 的全部信息（学校索引 + 系统引用）。客户端忽略未知键，因此新增 index 不破坏兼容。",
+  "description": "仓库的**唯一**生成物，由 scripts/snapshot.mjs 写出：保留主项目客户端消费的旧字段结构（version / schemaVersion / generatedAt / sources / hash，逐字段未变），并新增 index 字段承载原 presets/index.json 的全部信息（学校索引 + 系统引用）。客户端忽略未知键，新增 index 不破坏兼容。",
   "type": "object",
   "required": ["version", "schemaVersion", "generatedAt", "sources", "index", "hash"],
   "$defs": {

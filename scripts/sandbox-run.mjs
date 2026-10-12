@@ -17,10 +17,6 @@
  *        - stdio: 'pipe'                → 只通过管道传 JSON
  *        - env 白名单                    → 不泄漏宿主环境变量
  *
- *      ⚠ 重要事实（经实测，Node v24.19.0）：权限模型**不覆盖网络**。
- *        --permission 只约束 fs / child_process / worker / addons / wasi / inspector，
- *        没有任何 --allow-net / --deny-net 之类的开关（`node --allow-net` 报 bad option）。
- *        因此「不给权限就没网」是错误假设：适配器在子进程里**仍然能发起网络请求**。
  *   2) 子进程（--sandbox-child）：读 stdin 的 { html, url, hints }，动态 import 适配器，
  *      调用 parse()，把结果写成 stdout 上的 JSON。任何异常都转成 { ok:false, error }，
  *      不向父进程逃逸。
@@ -368,7 +364,7 @@ async function demoMain() {
   process.stdout.write('沙箱模型：受限子进程（Node 权限模型 + 资源上限 + 代码生成开关）\n');
   process.stdout.write(`权限参数：${detected.flag}（探测标签：${detected.label}）+ --disallow-code-generation-from-strings\n`);
   process.stdout.write(`资源上限：墙钟超时（execFile 的 timeout）、堆上限（--max-old-space-size）、stdio=${SANDBOX_LIMITS.stdio}\n`);
-  process.stdout.write(`环境变量白名单：${SANDBOX_LIMITS.envAllowlist.join(', ')}\n`);
+  process.stdout.write(`环境变量白名单：${SANDBOX_LIMITS.envAllowlist.join(', ')}\n\n`);
 
   let failures = 0;
 

@@ -5,8 +5,8 @@ on:
   push:
     branches: [main]
 
-# SOURCE_DATE_EPOCH 固定为 2026-01-01T00:00:00Z，保证快照可复现，
-# 从而让 `git diff --exit-code snapshot` 能稳定判断「内容是否变了」。
+# SOURCE_DATE_EPOCH 固定为 2026-01-01T00:00:00Z，快照由此可复现，
+# `git diff --exit-code snapshot` 由此能稳定判断「内容是否变了」。
 env:
   SOURCE_DATE_EPOCH: '1767225600'
 
@@ -50,7 +50,7 @@ jobs:
         id: hashcheck
         run: |
           if ! git diff --quiet -- snapshot; then
-            echo '### ❌ 生成物与提交内容不一致' >> "$GITHUB_STEP_SUMMARY"
+            echo '### 生成物与提交内容不一致' >> "$GITHUB_STEP_SUMMARY"
             echo '' >> "$GITHUB_STEP_SUMMARY"
             echo '内容变了但 `snapshot/presets-<version>.json` 没重新生成（或忘了提交）。' >> "$GITHUB_STEP_SUMMARY"
             echo '请在本地跑 `npm run snapshot` 后一起提交（快照是**唯一**生成物，`presets/index.json` 已取消）。' >> "$GITHUB_STEP_SUMMARY"
@@ -60,7 +60,7 @@ jobs:
             echo '```' >> "$GITHUB_STEP_SUMMARY"
             exit 1
           fi
-          echo '快照与提交内容一致 ✓'
+          echo '快照与提交内容一致'
 
       - name: 沙箱冒烟演示（正常适配器成功 + 越权/动态代码/死循环被拦截）
         id: demo
@@ -76,11 +76,11 @@ jobs:
             echo '| 步骤 | 结果 |'
             echo '| --- | --- |'
             echo "| Node 版本 | \`$(node --version)\` |"
-            echo "| \`npm run validate\` | ${{ steps.validate.conclusion == 'success' && '✅ 通过' || '❌ 失败' }} |"
-            echo "| \`npm test\` | ${{ steps.test.conclusion == 'success' && '✅ 通过' || '❌ 失败' }} |"
-            echo "| \`npm run snapshot\` | ${{ steps.snapshot.conclusion == 'success' && '✅ 通过' || '❌ 失败' }} |"
-            echo "| 生成物未变（唯一快照产物） | ${{ steps.hashcheck.conclusion == 'success' && '✅ 一致' || '❌ 不一致' }} |"
-            echo "| \`npm run sandbox:demo\` | ${{ steps.demo.conclusion == 'success' && '✅ 通过' || '❌ 失败' }} |"
+            echo "| \`npm run validate\` | ${{ steps.validate.conclusion == 'success' && '通过' || '失败' }} |"
+            echo "| \`npm test\` | ${{ steps.test.conclusion == 'success' && '通过' || '失败' }} |"
+            echo "| \`npm run snapshot\` | ${{ steps.snapshot.conclusion == 'success' && '通过' || '失败' }} |"
+            echo "| 生成物未变（唯一快照产物） | ${{ steps.hashcheck.conclusion == 'success' && '一致' || '不一致' }} |"
+            echo "| \`npm run sandbox:demo\` | ${{ steps.demo.conclusion == 'success' && '通过' || '失败' }} |"
             echo ''
             echo '> 沙箱为**受限子进程**（Node 权限模型 + 资源上限 + 代码生成开关）；'
             echo '> 威胁模型与拦截结果见 `sandbox/README.md`。'

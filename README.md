@@ -9,7 +9,7 @@
 | 学校 | `presets/schools/<school-id>/school.json` | 学校身份 + 作息时间表 + 对该校所用系统的覆盖（**一个文件**） |
 | 教务系统 | `presets/systems/<system-id>/system.json` | 元数据 / 识别特征 / 登录入口（**一个文件**） |
 
-> 目标：**让新学校接入不需要改主仓库代码**。你只要改一个 `school.json`（必要时加一个受限解析器 + 夹具），跑通校验，提 PR。
+> 目标：**让新学校接入不需要改主仓库代码**。改动范围为一个 `school.json`（必要时加一个受限解析器 + 夹具），通过校验后提 PR。
 
 ---
 
@@ -69,7 +69,7 @@ sandbox/adapter-contract.md               解析器接口契约（两个挂载�
 
 - `snapshot/presets-<version>.json` 是**唯一生成物**兼分发产物：
   - 顶层保留旧字段结构 `{ version, schemaVersion, generatedAt, sources: { timetables, systems, adapters }, hash }`；
-  - 新增 `index` 字段承载原 `presets/index.json` 的全部信息（客户端忽略未知键，因此结构演进不破坏兼容）。
+  - 新增 `index` 字段承载原 `presets/index.json` 的全部信息（客户端忽略未知键，结构演进不破坏兼容）。
 - **快照必须已提交**：CI 会重跑 `npm run snapshot` 后做 `git diff --exit-code snapshot`。
 - `hash` 的规范化范围 = **去掉 `hash` 之后的整个快照，包含 `index`**；也就是说改一行 index 就会改 hash。
 - 快照是生成物，**禁止手改**（`index._generated` 恒为 `true`，校验器会用它复算全量内容）。
@@ -107,23 +107,23 @@ sandbox/adapter-contract.md               解析器接口契约（两个挂载�
 - `system` 引用的系统 id 必须真实存在于 `presets/systems/`；不绑定教务系统时写 `null`。
 - `timetable.source` 必须写清依据（教务处公告 / 官网链接 / 用户提供截图）。凭印象写时间不会被合并。
 - `timetable.periods` 的 `periodNo` 必须从 1 起连续递增，`start`/`end` 严格 `HH:MM`，`end > start`，相邻节次不重叠。
-- **`schools/` 只收录我们真有数据的学校**——不要批量搬校名清单进来（没有真实作息数据的学校不建目录）。
+- **`schools/` 只收录有真实数据的学校**——不要批量搬校名清单进来（没有真实作息数据的学校不建目录）。
 
 #### 顶层字段一览
 
 | 字段 | 类型 | 必填 | 语义 |
 | --- | --- | --- | --- |
-| `id` | string | ✅ | 学校稳定标识（`^[a-z][a-z0-9_-]*$`），也是对外暴露的作息表 id |
-| `name` | string | ✅ | 中文展示名 |
+| `id` | string | 必填 | 学校稳定标识（`^[a-z][a-z0-9_-]*$`），也是对外暴露的作息表 id |
+| `name` | string | 必填 | 中文展示名 |
 | `shortName` / `region` / `province` / `city` / `tags` | string / string[] | | 展示与检索用（可选） |
 | `type` | string | | 学校类型，如 `university` / `college` / `generic` |
-| `system` | string \| null | ✅ | 该校使用的教务系统 id（必须在 `presets/systems/` 下存在）；`null` 表示不绑定 |
+| `system` | string \| null | 必填 | 该校使用的教务系统 id（必须在 `presets/systems/` 下存在）；`null` 表示不绑定 |
 | `aliases` | string[] | | 搜索别名 |
 | `generic` | boolean | | `true` 表示这是「通用作息」而非真实学校 |
 | `login` | object | | **覆盖**该系统 `login` 的 `entryPath` / `hint` |
 | `params` | object | | 追加到登录入口 query 的字符串键值对 |
 | `detect` | object | | 向系统级识别特征**追加** `markers` / `timetableTableIds` / `timetableTableClasses` |
-| `timetable` | object | ✅ | 作息时间表：`id` / `name` / `source?` / `periods[]` |
+| `timetable` | object | 必填 | 作息时间表：`id` / `name` / `source?` / `periods[]` |
 
 #### 覆盖语义（原 `config.json`，键白名单写死）
 
@@ -176,12 +176,12 @@ sandbox/adapter-contract.md               解析器接口契约（两个挂载�
 
 | 字段 | 类型 | 必填 | 语义 |
 | --- | --- | --- | --- |
-| `id` | string | ✅ | 系统 id，必须与目录名一致且在约定集合内 |
-| `name` | string | ✅ | 展示名 |
+| `id` | string | 必填 | 系统 id，必须与目录名一致且在约定集合内 |
+| `name` | string | 必填 | 展示名 |
 | `version` | string | | 该系统配置 / 解析器自身的版本号 |
 | `aliases` | string[] | | 识别 / 搜索别名 |
-| `detect` | object | ✅ | `markers` / `timetableTableIds` / `timetableTableClasses` / `gridCellIdPatterns` 四键齐全 |
-| `login` | object | ✅ | `entryPath`（必须 `/` 开头、不能含协议或域名）/ `hint` / `fields?` |
+| `detect` | object | 必填 | `markers` / `timetableTableIds` / `timetableTableClasses` / `gridCellIdPatterns` 四键齐全 |
+| `login` | object | 必填 | `entryPath`（必须 `/` 开头、不能含协议或域名）/ `hint` / `fields?` |
 
 - `markers` 与 `gridCellIdPatterns` 必须是**合法正则字符串**（`new RegExp` 能编译）。
 - `other` 表示「其他教务」，**不参与识别**，其 `detect` 各项必须为空数组。
@@ -227,7 +227,7 @@ npm run snapshot      # 生成 snapshot/presets-<version>.json（唯一产物，
 npm run sandbox:demo  # 沙箱演示：正常解析器成功 + 越权/动态代码/死循环被拦截
 ```
 
-`validate` 逐项输出中文结论，任一失败以非 0 退出。提 PR 前请确保 `npm run validate` 与 `npm test` 全绿，并已重跑 `npm run snapshot`。
+`validate` 逐项输出中文结论，任一失败以非 0 退出。提 PR 的前置条件：`npm run validate` 与 `npm test` 无报错，且 `npm run snapshot` 已重新生成。
 
 ### 校验都查了什么
 
@@ -252,16 +252,16 @@ npm run sandbox:demo  # 沙箱演示：正常解析器成功 + 越权/动态代�
 ## 审核流程
 
 1. **Fork + 分支**：`feat/school-<id>`、`fix/system-<id>`、`feat/parser-<id>`。
-   - 不想自己改代码？直接提 issue 也行：[请求适配学校](https://github.com/muyangplus/dawn-tick-presets/issues/new?template=request-school.yml)（没有适配器）
+   - 不便自行改代码时，可直接提 issue：[请求适配学校](https://github.com/muyangplus/dawn-tick-presets/issues/new?template=request-school.yml)（没有适配器）
      或 [适配失效 / 解析出错](https://github.com/muyangplus/dawn-tick-presets/issues/new?template=report-adapter-broken.yml)（已有适配器但解析不对），详见[遇到问题 / 想贡献](#遇到问题--想贡献)。
-2. **本地跑通**：`npm run validate && npm test && npm run snapshot`（快照要一起提交，见上「改预设的规矩」）。
+2. **本地校验**：`npm run validate && npm test && npm run snapshot`（快照要一起提交，见上「改预设的规矩」）。
 3. **提 PR**：PR 描述里写清**依据来源**（公告链接 / 截图 / 实测页面），解析器类 PR 请附上脱敏后的样例 HTML（放进 `fixtures/`）。
 4. **CI 自动把关**：`.github/workflows/validate.yml` 在 `ubuntu-latest` + Node 24 上跑 `validate` → `test` → `snapshot` → 生成物未变 → `sandbox:demo`，结论写进 PR 的 Step Summary。
 5. **人工复核**：
    - 数据类：核对来源真实性、时间是否与公告一致；
-   - 解析器类：逐行读代码，确认没有规避静态扫描的写法（如字符串拼接构造 `eval`、隐式网络调用），并确认夹具覆盖了真实页面结构；
+   - 解析器类：逐行读代码，确认未出现字符串拼接构造 `eval`、隐式外部请求等写法，并确认夹具覆盖了真实页面结构；
    - 一致性：确认 `version.json` 按下面的规则升过版，且快照已重新生成。
-6. **合并**：至少一位维护者 approve；CI 全绿后 squash merge。
+6. **合并**：至少一位维护者 approve；CI 通过后 squash merge。
 
 ---
 
@@ -295,7 +295,7 @@ npm run sandbox:demo  # 沙箱演示：正常解析器成功 + 越权/动态代�
 
 - `sources.timetables[].path` 是**符号路径**，恒为 `presets/schools/<校目录>/timetable.json`（真实文件已合并进 `school.json`）；
   `sha256` 是**原始作息 JSON 文本**的哈希 —— 合并时把 `timetable` 的值**逐字节**内嵌（只整体缩进一层），
-  因此这些哈希与合并前**完全一致**（这也是 `scripts/snapshot.mjs` 的 `extractTimetableText` 存在的唯一原因：
+  这些哈希与合并前**完全一致**（这也是 `scripts/snapshot.mjs` 的 `extractTimetableText` 存在的唯一原因：
   绝不能走 `JSON.stringify` 重新排版，否则字节会变、哈希会变）。
 - `sources.systems[].path` 是符号路径 `presets/systems/<id>/system.json`；
   `sha256` 是把 `system.json` 按**旧扁平结构**（`scripts/lib/legacy.mjs`）编译出的文本哈希。
@@ -326,12 +326,12 @@ npm run sandbox:demo  # 沙箱演示：正常解析器成功 + 越权/动态代�
 > 2. 本次「配置合并」（meta+timetable+config → `school.json`；meta+login → `system.json`；取消 `presets/index.json`、
 >    信息并入快照 `index`）同样属于结构变更。
 >
-> 但**分发格式（快照的旧字段结构与全部 sha256）完全没变**，主项目客户端无需改代码即可继续消费，因此经维护者确认：
+> 但**分发格式（快照的旧字段结构与全部 sha256）完全没变**，主项目客户端不改代码即可继续消费，维护者据此确认：
 > `version` 保持 `0.1.0`、`schemaVersion` 保持 `1`。
 
 ### 快照可复现（CI 强制）
 
-`generatedAt` 优先取 `--at <ISO>`，其次取环境变量 `SOURCE_DATE_EPOCH`（Unix 秒），都没有才用当前时间。CI 用固定值，因此：
+`generatedAt` 优先取 `--at <ISO>`，其次取环境变量 `SOURCE_DATE_EPOCH`（Unix 秒），都没有才用当前时间。CI 用固定值：
 
 - 内容没变 → 快照不变 → `git diff --exit-code snapshot` 通过；
 - 内容变了但忘了重新生成 → 该步骤失败，提醒你 `npm run snapshot`。
@@ -358,9 +358,9 @@ git status --short snapshot   # 应为空
 - **标签用途**：`request-school.yml` 会自动打 `school-request`（学校适配请求，按校名统计需求），
   `report-adapter-broken.yml` 会自动打 `adapter-broken`（已有适配器失效，优先修正确性）。
   维护者按这两个标签筛选与排期，**请不要手动改动这两个标签**。
-- 提 issue **不要求你会写代码**：模板里的「需要指导」就是让我们在 issue 里一步步教你怎么取页面样本 / 作息数据。
+- 提 issue **不要求你会写代码**：模板里的「需要指导」即表示在 issue 里逐步给出取页面样本 / 作息数据的方法。
 - 两种模板都**严禁粘贴教务系统账号、密码、Cookie、真实学号姓名**；页面样本必须脱敏（规则见 [sandbox/adapter-contract.md](sandbox/adapter-contract.md)）。
-- 只要标签里的学校**还没有** `presets/schools/<school-id>/school.json`（有真实作息数据），就属于「请求适配」，别开成「失效」。
+- 只要标签里的学校**还没有** `presets/schools/<school-id>/school.json`（有真实作息数据），就属于「请求适配」，不要开成「失效」。
 
 ---
 

@@ -8,10 +8,10 @@ body:
       value: |
         ### 提交前请先确认
 
-        1. 🔒 **请勿粘贴账号密码、Cookie 或含个人信息的截图**（学号、姓名、身份证号、带真实姓名的课表）。
+        1. **请勿粘贴账号密码、Cookie 或含个人信息的截图**（学号、姓名、身份证号、带真实姓名的课表）。
            需要提供页面样本时请先**脱敏**，只保留 HTML 结构与课表表格。
-        2. 🧾 尽量给出**能复现问题的最小信息**：学校、教务系统、从哪一步开始出错、界面上提示的原文。
-        3. 🔧 想自己动手修解析器？先读
+        2. 尽量给出**能复现问题的最小信息**：学校、教务系统、从哪一步开始出错、界面上提示的原文。
+        3. 想自己动手修解析器？先读
            [sandbox/adapter-contract.md](https://github.com/muyangplus/dawn-tick-presets/blob/main/sandbox/adapter-contract.md)
            与 [README · 能贡献什么](https://github.com/muyangplus/dawn-tick-presets/blob/main/README.md#能贡献什么)。
 

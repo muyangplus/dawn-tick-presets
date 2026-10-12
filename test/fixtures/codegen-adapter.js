@@ -3,7 +3,7 @@
  *
  * 尝试 eval / new Function —— 动态代码生成样本。
  * 父进程起子进程时带了 --disallow-code-generation-from-strings，
- * 因此这两者都会抛 ERR_ACCESS_DENIED / EvalError。
+ * 这两者都会抛 ERR_ACCESS_DENIED / EvalError。
  *
  * 期望结果：{ ok:false, error:{ code:'SANDBOX_PERMISSION_DENIED' } }
  */

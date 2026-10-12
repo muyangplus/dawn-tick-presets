@@ -1,7 +1,7 @@
 # 解析器接口契约（`presets/systems/<system-id>/parse.js` 与 `presets/schools/<school-id>/parse.js`）
 
 解析器负责把某个教务系统课表页面的 **HTML** 变成晓刻能用的**事件列表**。
-因为它是「外部贡献的、会被执行的代码」，所以它的运行环境是受限沙箱，接口也被刻意收窄。
+它是「外部贡献的、会被执行的代码」，运行环境是受限沙箱，接口也被刻意收窄。
 
 > 先读 [README.md](README.md) 了解沙箱的运行约束与拦截结果。
 
@@ -14,7 +14,7 @@
 | 位置 | 作用范围 | 何时用 |
 | --- | --- | --- |
 | `presets/systems/<system-id>/parse.js` | 该教务系统的**所有**学校 | 大多数系统通用（默认选择） |
-| `presets/schools/<school-id>/parse.js` | **仅**这一所学校 | 某校页面结构被魔改，系统级解析器搞不定 |
+| `presets/schools/<school-id>/parse.js` | **仅**这一所学校 | 某校页面结构被魔改，系统级解析器不适用 |
 
 **优先级：学校级 ＞ 系统级。** 两者都存在时，该校用学校级解析器；系统级解析器继续服务其他学校。
 校验报告里有一条 `D3. 解析器优先级（学校级 > 系统级）` 会把这个判断显式打出来。
@@ -55,10 +55,10 @@ export function parse({ html, url, hints }) {
 
 | 字段 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
-| `title` | `string` | ✅ | 课程名 |
-| `dayOfWeek` | `integer` | ✅ | 1=周一 … 7=周日 |
-| `periodStart` | `integer` | ✅ | 起始节次，从 1 开始 |
-| `periodEnd` | `integer` | ✅ | 结束节次（含），≥ `periodStart` |
+| `title` | `string` | 必填 | 课程名 |
+| `dayOfWeek` | `integer` | 必填 | 1=周一 … 7=周日 |
+| `periodStart` | `integer` | 必填 | 起始节次，从 1 开始 |
+| `periodEnd` | `integer` | 必填 | 结束节次（含），≥ `periodStart` |
 | `room` | `string` | | 教室，未知就给 `""` |
 | `teacher` | `string` | | 教师，未知就给 `""` |
 | `weeks` | `integer[]` | | 上课周次，`[]` 表示未解析出周次 |
@@ -94,11 +94,11 @@ export function parse({ html, url, hints }) {
 | --- | --- | --- |
 | 权限模型 | `node --permission` | Node 24 的权限系统 |
 | 文件读取 | `--allow-fs-read=<解析器所在目录>` | 只读白名单，只放开那一个目录 |
-| 文件写入 | ❌ 拒绝 | 不传 `--allow-fs-write` |
-| 子进程 | ❌ 拒绝 | 不传 `--allow-child-process` |
-| worker_threads | ❌ 拒绝 | 不传 `--allow-worker` |
-| 原生插件 | ❌ 拒绝 | 不传 `--allow-addons` |
-| 动态代码生成 | ❌ 拒绝 | `--disallow-code-generation-from-strings` |
+| 文件写入 | 拒绝 | 不传 `--allow-fs-write` |
+| 子进程 | 拒绝 | 不传 `--allow-child-process` |
+| worker_threads | 拒绝 | 不传 `--allow-worker` |
+| 原生插件 | 拒绝 | 不传 `--allow-addons` |
+| 动态代码生成 | 拒绝 | `--disallow-code-generation-from-strings` |
 | 内存 | 堆上限 | `--max-old-space-size` |
 | 墙钟超时 | 上限 | `execFile` 的 `timeout` |
 | 环境变量 | 白名单 | 只传 `PATH`/`SystemRoot`/`windir`/`TEMP`/`TMP`/`LANG`/`LC_ALL` |
@@ -132,7 +132,7 @@ export function parse({ html, url, hints }) {
 }
 ```
 
-### 实用建议
+### 实用约束
 
 - **只用正则和字符串处理**（沙箱里没有 DOM，也拿不到任何库）。
 - 循环务必有界：`while (match !== null)` + `re.exec` 会自然收敛；不要写 `while (true)`。
@@ -176,19 +176,20 @@ export function parse({ html, url, hints }) {
 - `expect.events` 是给人看的完整期望，也是沙箱逐条比对的基准；
 - HTML 请**脱敏**：删掉学号、姓名、Cookie、真实 token，只保留结构。
 
-> 解析器在真实页面上失效（识别不到课表 / 缺课 / 时间错）时，不用先自己写代码：
-> 提 [适配失效 / 解析出错](https://github.com/muyangplus/dawn-tick-presets/issues/new?template=report-adapter-broken.yml) issue 并附上脱敏后的页面 HTML 即可，
-> 不知道怎么取样本就选「暂时不能」，我们会在 issue 里指导。判定口径见 [README · 遇到问题 / 想贡献](../README.md#遇到问题--想贡献)。
+> 解析器在真实页面上失效（识别不到课表 / 缺课 / 时间错）时，可先提
+> [适配失效 / 解析出错](https://github.com/muyangplus/dawn-tick-presets/issues/new?template=report-adapter-broken.yml) issue 并附上脱敏后的页面 HTML，
+> 不必先自行编写解析器。样本获取方式不确定时选「暂时不能」，issue 里会给出取样本的步骤。
+> 判定口径见 [README · 遇到问题 / 想贡献](../README.md#遇到问题--想贡献)。
 
 ### 本地自查
 
 ```bash
 npm run validate      # 含静态扫描 + 沙箱冒烟
 npm test              # 单元测试
-npm run sandbox:demo  # 看沙箱如何拦截越权/死循环解析器
+npm run sandbox:demo  # 沙箱拦截演示：越权写文件 / 动态代码生成 / 死循环
 ```
 
-想手动跑一个解析器：
+手动运行一个解析器：
 
 ```bash
 node --permission --disallow-code-generation-from-strings \

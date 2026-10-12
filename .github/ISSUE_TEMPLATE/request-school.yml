@@ -8,12 +8,12 @@ body:
       value: |
         ### 提交前请先确认三件事
 
-        1. 🔍 **这所学校是否已经适配**：看 [README · 能贡献什么](https://github.com/muyangplus/dawn-tick-presets/blob/main/README.md#能贡献什么)
+        1. **这所学校是否已经适配**：看 [README · 能贡献什么](https://github.com/muyangplus/dawn-tick-presets/blob/main/README.md#能贡献什么)
            （已适配的学校在 `presets/schools/<school-id>/school.json` 里有真实作息数据），
            或在晓刻「学校查找」页直接搜校名 / 别名。找到了就不用提这个 issue。
-        2. 🔒 **请勿粘贴账号密码**，也不要上传含个人信息的截图（学号、姓名、身份证号、Cookie、真实个人课表）。
+        2. **请勿粘贴账号密码**，也不要上传含个人信息的截图（学号、姓名、身份证号、Cookie、真实个人课表）。
            本表单只需要**公开信息**：学校全名、所在省市、教务系统登录页 URL、作息时间。
-        3. ✍️ 一次提交**一所学校**；多所学校请分别提交，方便逐校跟踪。
+        3. 一次提交**一所学校**；多所学校请分别提交，方便逐校跟踪。
 
   - type: input
     id: school-name
@@ -68,7 +68,7 @@ body:
     id: can-help
     attributes:
       label: 是否愿意提供页面样本或作息数据
-      description: 适配解析器通常需要一份**脱敏后**的课表页面样本；愿意提供的话我们会在 issue 里告诉你具体怎么取
+      description: 适配解析器通常需要一份**脱敏后**的课表页面样本；愿意提供时会在 issue 里给出具体取样本步骤
       options:
         - 愿意提供
         - 需要指导

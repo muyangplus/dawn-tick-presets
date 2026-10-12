@@ -14,11 +14,11 @@
  * - 顶层 `version / schemaVersion / generatedAt / sources / hash` **逐字段保持旧结构**
  *   （主仓库客户端只认这些，客户端会忽略未知键），`index` 是**新增字段**：
  *   它承载原 `presets/index.json` 的全部信息（学校索引 + 系统引用），
- *   本仓库因此**不再产出** `presets/index.json`。
+ *   本仓库**不再产出** `presets/index.json`。
  * - `sources.timetables[].path` 是**符号路径**（历史契约）：**恒为**
  *   `presets/schools/<校目录>/timetable.json`；`sha256` 是**原始作息 JSON 文本**的哈希。
- *   合并进 school.json 时我们**逐字节**保留 timetable 的值（只整体缩进一层），
- *   因此哈希与合并前完全一致（见 schema/snapshot.schema.json 与 README）。
+ *   合并进 school.json 时 timetable 的值**逐字节**保留（只整体缩进一层），
+ *   哈希与合并前完全一致（见 schema/snapshot.schema.json 与 README）。
  * - `sources.systems[].path` 同样是历史契约里的**符号路径** `presets/systems/<id>/system.json`，
  *   `sha256` 是 system.json 按旧扁平结构（lib/legacy.mjs）编译出的文本哈希。
  * - `sources.adapters`：系统解析器键名 `<系统id>.js`，学校解析器键名 `<学校id>.js`
@@ -27,7 +27,7 @@
  *   规范化 JSON（对象键排序、无多余空白）后的 sha256。
  *
  * 可复现性：generatedAt 优先取 --at <ISO>，其次取 SOURCE_DATE_EPOCH（Unix 秒），
- * 都没有才用当前时间。CI 固定取值，因此重跑后 `git diff --exit-code snapshot` 必须为空。
+ * 都没有才用当前时间。CI 固定取值：重跑后 `git diff --exit-code snapshot` 必须为空。
  *
  * 用法：
  *   node scripts/snapshot.mjs
@@ -49,7 +49,7 @@ export function sha256(text) {
 
 /**
  * 规范化 JSON 序列化：对象键排序、数组保持顺序、无多余空白。
- * 这保证同一份数据在任何机器上都得到同一个哈希。
+ * 同一份数据在任何机器上得到同一个哈希。
  */
 export function canonicalJson(value) {
   if (value === null || typeof value !== 'object') return JSON.stringify(value);
@@ -84,7 +84,7 @@ function readVersion(root) {
 /**
  * 从 school.json 的文件文本里切出内嵌的 `timetable` 值，还原成「独立 timetable.json」的字节。
  *
- * 为什么不用 JSON.stringify：原作息文件里每个节次是
+ * 不能走 JSON.stringify：原作息文件里每个节次是
  * **单行紧凑写法**（periodNo / start / end 三个键挤在一行），
  * 重新排版会改变字节、进而改变 `sources.timetables[].sha256`。
  * 这里只信任原文：切出内嵌片段 → 去掉额外一层缩进 → 补回结尾换行。

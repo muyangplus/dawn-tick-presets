@@ -2,7 +2,7 @@
  * legacy.mjs —— 把作者结构（合并后的 `systems/<id>/system.json`）编译成
  * **旧扁平结构**的系统配置对象。
  *
- * 为什么需要它：分发格式（`snapshot/presets-<version>.json`）必须保持不变，
+ * 需要它的原因：分发格式（`snapshot/presets-<version>.json`）保持不变，
  * 主仓库客户端只认 `sources.systems` 里那种「一个系统一份扁平 JSON」的形状：
  *
  *   { id, name, entryPath, hint, detect: { markers, timetableTableIds,
@@ -10,8 +10,8 @@
  *
  * 历史沿革：这份数据最初是一个扁平文件 `presets/systems/<id>.json`，随后被拆成
  * `meta.json` + `login.json` 两个文件，现在又合并成 `system.json` 一个文件。
- * 无论形态怎么变，编译规则固定（键序为旧文件的历史顺序），
- * 因此对未改动的系统，编译产物与最开始的旧文件**逐字节一致、sha256 也一致**。
+ * 无论形态怎么变，编译规则固定（键序为旧文件的历史顺序）：
+ * 未改动的系统，编译产物与最开始的旧文件**逐字节一致、sha256 也一致**。
  */
 
 import { readFileSync } from 'node:fs';
@@ -45,7 +45,7 @@ export function stringifyLegacy(value, depth = 0) {
  * 编译成旧扁平结构对象（键序按 LEGACY_SYSTEM_KEY_ORDER）。
  *
  * 合并前这份数据来自 meta.json + login.json 两个文件；合并后来自同一个 system.json，
- * 但字段语义完全不变，因此编译产物（以及分发给客户端的哈希）逐字节不变。
+ * 字段语义不变，编译产物（以及分发给客户端的哈希）逐字节不变。
  * @param {{ id: string, name?: string, detect?: object, login?: object }} doc
  */
 export function compileSystemConfig(doc) {
@@ -83,8 +83,8 @@ export function compileSystemFromRepo(root, id) {
 
 /**
  * `sources.systems[]` 里的 path 是**符号路径**：新结构下不再存在「一个系统一个 .json」的
- * 真实文件，这一项代表的是编译产物。这样做是为了在目录结构变化的同时，
- * 保证 snapshot 的字段结构（`{ id, path, sha256 }`）与语义对客户端完全不变。
+ * 真实文件，这一项代表的是编译产物。目录结构变化后，snapshot 的字段结构
+ * （`{ id, path, sha256 }`）与语义对客户端不变。
  */
 export function systemSourcePath(id) {
   return `presets/systems/${id}/system.json`;

@@ -22,6 +22,7 @@
   │      '--permission',                              ← Node 权限模型
   │      '--disallow-code-generation-from-strings',   ← 禁 eval / new Function
   │      '--allow-fs-read=<解析器所在目录>',           ← 只读白名单（学校级或系统级目录，只有一个）
+  │      '--max-old-space-size=<堆上限>',              ← JS 堆上限
   │      <sandbox-run.mjs> '--sandbox-child' <parse.js 路径> ← 双角色文件
   │  ], { timeout: <墙钟上限>, stdio: 'pipe', env: 白名单 })
   │
@@ -37,23 +38,24 @@
 适配器在**独立子进程**中执行，父子进程之间只交换 JSON 字符串。运行约束由 Node 权限模型、资源上限参数与代码生成开关共同施加。
 
 **`stdio: 'pipe'` 的作用**：宿主与沙箱之间只交换 JSON 字符串，沙箱拿不到宿主的文件描述符、tty 或终端能力；父进程也不把子进程的 stdout 直接透传给用户。
+
 ---
 
 ## 3. 拦截结果
 
 | 攻击 / 故障 | 结果 | 结构化错误码 |
 | --- | --- | --- |
-| 写文件（`writeFileSync`） | ❌ 拒绝 | `SANDBOX_PERMISSION_DENIED`（`Access to this API has been restricted. Use --allow-fs-write…`） |
+| 写文件（`writeFileSync`） | 拒绝 | `SANDBOX_PERMISSION_DENIED`（`Access to this API has been restricted. Use --allow-fs-write…`） |
 | `eval(...)` / `new Function(...)` | 拒绝 | `SANDBOX_PERMISSION_DENIED`（`Code generation from strings disallowed for this context`） |
-| 读白名单外的文件（如 `C:\Windows\win.ini`、`/etc/hostname`） | ❌ 拒绝 | `SANDBOX_PERMISSION_DENIED`（`ERR_ACCESS_DENIED`，`Use --allow-fs-read…`） |
-| 起子进程（`child_process`） | ❌ 拒绝 | `SANDBOX_PERMISSION_DENIED`（未传 `--allow-child-process`） |
+| 读白名单外的文件（如 `C:\Windows\win.ini`、`/etc/hostname`） | 拒绝 | `SANDBOX_PERMISSION_DENIED`（`ERR_ACCESS_DENIED`，`Use --allow-fs-read…`） |
+| 起子进程（`child_process`） | 拒绝 | `SANDBOX_PERMISSION_DENIED`（未传 `--allow-child-process`） |
 | `worker_threads` | 拒绝 | `SANDBOX_PERMISSION_DENIED`（未传 `--allow-worker`） |
-| 原生插件 `.node` | ❌ 拒绝 | `SANDBOX_PERMISSION_DENIED`（未传 `--allow-addons`） |
+| 原生插件 `.node` | 拒绝 | `SANDBOX_PERMISSION_DENIED`（未传 `--allow-addons`） |
 | 死循环 / 长时间计算 | 终止 | `SANDBOX_TIMEOUT`（`execFile` 的 `timeout` 到期后以 SIGTERM 结束子进程） |
 | 内存膨胀 | 终止 | `SANDBOX_OOM` 或 `SANDBOX_NO_OUTPUT`（`--max-old-space-size`） |
-| 抛异常 / 未处理 Promise 拒绝 | ✅ 转结构化错误 | `ADAPTER_THREW` / `ADAPTER_UNHANDLED_REJECTION` |
-| 语法错误 / 导出不对 | ✅ 转结构化错误 | `ADAPTER_IMPORT_FAILED` / `ADAPTER_NO_PARSE` |
-| 返回 Promise / 结构不对 | ✅ 转结构化错误 | `ADAPTER_NOT_SYNC` / `ADAPTER_BAD_RESULT` / `ADAPTER_BAD_EVENT` |
+| 抛异常 / 未处理 Promise 拒绝 | 转结构化错误 | `ADAPTER_THREW` / `ADAPTER_UNHANDLED_REJECTION` |
+| 语法错误 / 导出不对 | 转结构化错误 | `ADAPTER_IMPORT_FAILED` / `ADAPTER_NO_PARSE` |
+| 返回 Promise / 结构不对 | 转结构化错误 | `ADAPTER_NOT_SYNC` / `ADAPTER_BAD_RESULT` / `ADAPTER_BAD_EVENT` |
 | 读取宿主环境变量 | 收窄到白名单 | `env` 只传：`PATH`、`SystemRoot`、`windir`、`TEMP`、`TMP`、`LANG`、`LC_ALL` |
 
 **错误出口**：以上任何情况，父进程都拿不到未捕获异常，只会得到 `{ ok:false, error:{ code, message, stage } }`。
@@ -101,4 +103,4 @@ JSON
 测试夹具（`test/fixtures/`）里的 `evil-adapter.js`、`codegen-adapter.js`、`hang-adapter.js`
 **只在 demo 与测试中使用**，不进入 `presets/**/parse.js`（`validate` 只扫描后者）。
 解析器自己的夹具放在 `presets/systems/<id>/fixtures/` 或 `presets/schools/<dir>/fixtures/`，
-是**数据**（页面样本 + 期望事件），不是可执行代码。
+属于**数据**（页面样本 + 期望事件），不是可执行代码。
