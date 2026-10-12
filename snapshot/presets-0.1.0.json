@@ -1,45 +1,45 @@
 {
-  "version": "1.0.0",
+  "version": "0.1.0",
   "schemaVersion": 1,
   "generatedAt": "2026-01-01T00:00:00.000Z",
   "sources": {
     "timetables": [
       {
         "id": "default",
-        "path": "presets/timetables/default.json",
+        "path": "presets/schools/_default/timetable.json",
         "sha256": "sha256:1dea538e8d0113060d63dee0c2ebd4068e515b7d77dce6e9446200343f3564b3"
       },
       {
         "id": "usts",
-        "path": "presets/timetables/usts.json",
+        "path": "presets/schools/usts/timetable.json",
         "sha256": "sha256:7f60536005ef6bce600b4beff8bed52fe32f223f72cb8eb2ba3b1d90a80c58b0"
       }
     ],
     "systems": [
       {
         "id": "jwglxt",
-        "path": "presets/systems/jwglxt.json",
+        "path": "presets/systems/jwglxt/system.json",
         "sha256": "sha256:1941bb2ba38310ddd806761b73bb8b6b8dbb88873588fdfa91459214d4b302f6"
       },
       {
         "id": "other",
-        "path": "presets/systems/other.json",
+        "path": "presets/systems/other/system.json",
         "sha256": "sha256:5267d69d0c21271af940fb68d84b011a0808154294fae2b9e92a3efe065e8669"
       },
       {
         "id": "qzdatasource",
-        "path": "presets/systems/qzdatasource.json",
+        "path": "presets/systems/qzdatasource/system.json",
         "sha256": "sha256:4bcd4571220c4be38f4ae319b4eae3d641d1ea1bf655a82d8d65814d330b23e1"
       },
       {
         "id": "urp",
-        "path": "presets/systems/urp.json",
+        "path": "presets/systems/urp/system.json",
         "sha256": "sha256:9e7c5f59be36d1bbf6909e8f27cd881c4beff0662732e2fd6881b8c2190cb961"
       }
     ],
     "adapters": {
-      "jwglxt.js": "sha256:d408705908db8419c38a19299a7a491a0bb66387f7c70639a90c5f32cb70e1c6"
+      "jwglxt.js": "sha256:070522737bf3d60b4f2fff8dd246c2664acef7ce9189e862a8934c40068fa4b0"
     }
   },
-  "hash": "sha256:9b144c0ceaf56e50c0e3bfe2e8baf114ff4606288952f36e6078da643d931edf"
+  "hash": "sha256:9e561d57adbfef0d4fe74a71f8958207e10d0ea0ff399e2011c033472d39fb63"
 }

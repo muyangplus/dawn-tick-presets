@@ -356,6 +356,11 @@ function loadFixture(name) {
   return fileURLToPath(new URL(`../test/fixtures/${name}`, import.meta.url));
 }
 
+/** 系统目录下的夹具（systems/<id>/fixtures/）。 */
+function loadSystemFixture(system, name) {
+  return fileURLToPath(new URL(`../presets/systems/${system}/fixtures/${name}`, import.meta.url));
+}
+
 async function demoMain() {
   const root = fileURLToPath(new URL('..', import.meta.url));
   const detected = detectPermissionFlag();
@@ -367,9 +372,9 @@ async function demoMain() {
 
   let failures = 0;
 
-  process.stdout.write('\u001b[1m[1/4] 正常适配器（presets/adapters/jwglxt.js）\u001b[0m\n');
-  const adapterPath = resolve(root, 'presets', 'adapters', 'jwglxt.js');
-  const sampleHtml = readFileSync(loadFixture('jwglxt-page.html'), 'utf8');
+  process.stdout.write('\u001b[1m[1/4] 正常解析器（presets/systems/jwglxt/parse.js）\u001b[0m\n');
+  const adapterPath = resolve(root, 'presets', 'systems', 'jwglxt', 'parse.js');
+  const sampleHtml = readFileSync(loadSystemFixture('jwglxt', 'sample-page.html'), 'utf8');
   const good = await runAdapterSandbox({
     adapterPath,
     input: { html: sampleHtml, url: 'https://jwgl.usts.edu.cn/jwglxt/xskb/query', hints: {} },

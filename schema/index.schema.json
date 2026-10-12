@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dawn-tick.dev/schema/index.schema.json",
+  "title": "DawnTick 预设索引（presets/index.json）",
+  "description": "构建产物，由 scripts/snapshot.mjs 生成，禁止手改（_generated 恒为 true）。列出学校索引、系统引用与仓库版本。",
+  "type": "object",
+  "required": ["_generated", "version", "schemaVersion", "generatedAt", "schools", "systems"],
+  "properties": {
+    "_generated": { "const": true, "description": "恒为 true：本文件由脚本生成，手改会被 CI 的 git diff 检查抓到。" },
+    "version": { "type": "string", "minLength": 1, "description": "与 version.json 的 version 一致。" },
+    "schemaVersion": { "type": "integer", "minimum": 1, "description": "与 version.json 的 schemaVersion 一致。" },
+    "generatedAt": { "type": "string", "minLength": 1, "description": "生成时间，取值规则同快照（--at > SOURCE_DATE_EPOCH > 当前时间）。" },
+    "schools": {
+      "type": "array",
+      "description": "学校索引，按 id 排序。system 为 null 表示不绑定教务系统（通用作息）。",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "system", "configPath", "timetablePath", "generic", "default"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z][a-z0-9_-]*$" },
+          "name": { "type": "string", "minLength": 1 },
+          "region": { "type": "string", "minLength": 1 },
+          "type": { "type": "string", "minLength": 1 },
+          "system": { "type": ["string", "null"] },
+          "aliases": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+          "generic": { "type": "boolean" },
+          "default": { "type": "boolean", "description": "true 表示没有专属作息时使用的通用作息。" },
+          "configPath": {
+            "type": ["string", "null"],
+            "minLength": 1,
+            "description": "该校 config.json 的相对路径；没有 config.json 时为 null（如通用作息）。"
+          },
+          "timetablePath": { "type": "string", "minLength": 1 }
+        },
+        "additionalProperties": false
+      }
+    },
+    "systems": {
+      "type": "array",
+      "description": "系统引用，按 id 排序。config 是 meta.json + login.json 合并后的编译产物（旧扁平结构）。",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "hasParser", "metaPath", "loginPath", "detect"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z][a-z0-9_-]*$" },
+          "name": { "type": "string", "minLength": 1 },
+          "version": { "type": "string", "minLength": 1 },
+          "aliases": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+          "hasParser": { "type": "boolean", "description": "是否存在 parse.js。" },
+          "parserPath": { "type": "string", "minLength": 1 },
+          "metaPath": { "type": "string", "minLength": 1 },
+          "loginPath": { "type": "string", "minLength": 1 },
+          "detect": { "type": "object" },
+          "entryPath": { "type": "string", "minLength": 1 },
+          "hint": { "type": "string", "minLength": 1 }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

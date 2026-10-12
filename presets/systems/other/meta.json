@@ -1,8 +1,11 @@
 {
   "id": "other",
   "name": "其他教务",
-  "entryPath": "/",
-  "hint": "自行登录后打开课表页",
+  "version": "1.0.0",
+  "aliases": [
+    "other",
+    "其他教务"
+  ],
   "detect": {
     "markers": [],
     "timetableTableIds": [],

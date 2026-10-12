@@ -1,0 +1,142 @@
+{
+  "_generated": true,
+  "version": "0.1.0",
+  "schemaVersion": 1,
+  "generatedAt": "2026-01-01T00:00:00.000Z",
+  "schools": [
+    {
+      "id": "default",
+      "name": "通用作息",
+      "type": "generic",
+      "system": null,
+      "aliases": [
+        "默认作息"
+      ],
+      "generic": true,
+      "default": true,
+      "configPath": null,
+      "timetablePath": "presets/schools/_default/timetable.json"
+    },
+    {
+      "id": "usts",
+      "name": "苏州科技大学",
+      "region": "江苏",
+      "type": "university",
+      "system": "jwglxt",
+      "aliases": [
+        "苏州科技大学",
+        "苏科大",
+        "USTS"
+      ],
+      "generic": false,
+      "default": false,
+      "configPath": "presets/schools/usts/config.json",
+      "timetablePath": "presets/schools/usts/timetable.json"
+    }
+  ],
+  "systems": [
+    {
+      "id": "jwglxt",
+      "name": "正方教务",
+      "version": "1.0.0",
+      "aliases": [
+        "jwglxt",
+        "正方教务"
+      ],
+      "hasParser": true,
+      "parserPath": "presets/systems/jwglxt/parse.js",
+      "metaPath": "presets/systems/jwglxt/meta.json",
+      "loginPath": "presets/systems/jwglxt/login.json",
+      "detect": {
+        "markers": [
+          "jwglxt",
+          "xskb_list",
+          "timetable_con",
+          "kbgrid_table"
+        ],
+        "timetableTableIds": [
+          "kbtable"
+        ],
+        "timetableTableClasses": [
+          "kb",
+          "timetable",
+          "schedule",
+          "skb"
+        ],
+        "gridCellIdPatterns": [
+          "\\d{1,2}[-_]\\d{1,2}"
+        ]
+      },
+      "entryPath": "/jwglxt/xtgl/login_slogin.html",
+      "hint": "个人课表查询在「信息查询 → 学生课表查询」"
+    },
+    {
+      "id": "other",
+      "name": "其他教务",
+      "version": "1.0.0",
+      "aliases": [
+        "other",
+        "其他教务"
+      ],
+      "hasParser": false,
+      "metaPath": "presets/systems/other/meta.json",
+      "loginPath": "presets/systems/other/login.json",
+      "detect": {
+        "markers": [],
+        "timetableTableIds": [],
+        "timetableTableClasses": [],
+        "gridCellIdPatterns": []
+      },
+      "entryPath": "/",
+      "hint": "自行登录后打开课表页"
+    },
+    {
+      "id": "qzdatasource",
+      "name": "强智教务",
+      "version": "1.0.0",
+      "aliases": [
+        "qzdatasource",
+        "强智教务"
+      ],
+      "hasParser": false,
+      "metaPath": "presets/systems/qzdatasource/meta.json",
+      "loginPath": "presets/systems/qzdatasource/login.json",
+      "detect": {
+        "markers": [
+          "qzdatasource",
+          "强智",
+          "qzjw"
+        ],
+        "timetableTableIds": [],
+        "timetableTableClasses": [],
+        "gridCellIdPatterns": []
+      },
+      "entryPath": "/jsxsd/",
+      "hint": "课表在「培养管理 → 我的课表」"
+    },
+    {
+      "id": "urp",
+      "name": "URP 教务",
+      "version": "1.0.0",
+      "aliases": [
+        "urp",
+        "URP 教务"
+      ],
+      "hasParser": false,
+      "metaPath": "presets/systems/urp/meta.json",
+      "loginPath": "presets/systems/urp/login.json",
+      "detect": {
+        "markers": [
+          "urp",
+          "教学信息服务平台",
+          "jwgl\\.urp"
+        ],
+        "timetableTableIds": [],
+        "timetableTableClasses": [],
+        "gridCellIdPatterns": []
+      },
+      "entryPath": "/",
+      "hint": "综合教务系统，课表在「课表查询」"
+    }
+  ]
+}

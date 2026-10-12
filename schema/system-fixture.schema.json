@@ -1,10 +1,10 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://dawn-tick.dev/schema/conformance.schema.json",
-  "title": "DawnTick 适配器自检用例",
-  "description": "适配器一致性用例：给定 HTML 片段与提示，适配器必须产出可预期的课表事件。",
+  "$id": "https://dawn-tick.dev/schema/system-fixture.schema.json",
+  "title": "DawnTick 适配器一致性用例（systems/<id>/fixtures/expected-events.json）",
+  "description": "夹具里的期望事件。fixtures/ 至少要有 1 个页面样本与 1 个期望事件文件：有 parse.js 就必须有夹具，否则校验失败。",
   "type": "object",
-  "required": ["id", "system", "adapter", "input", "expect"],
+  "required": ["id", "system", "adapter", "fixtures", "input", "expect"],
   "properties": {
     "id": {
       "type": "string",
@@ -14,19 +14,34 @@
     },
     "system": {
       "type": "string",
-      "enum": ["jwglxt", "qzdatasource", "urp", "other"],
-      "description": "该用例针对的教务系统 id。"
+      "minLength": 1,
+      "pattern": "^[a-z][a-z0-9_-]*$",
+      "description": "该用例针对的教务系统 id，必须与所在目录名一致。"
+    },
+    "school": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[a-z][a-z0-9_-]*$",
+      "description": "可选：页面样本来自哪所学校。"
     },
     "adapter": {
       "type": "string",
       "pattern": "^[a-z][a-z0-9_-]*\\.js$",
-      "description": "适配器文件名，位于 presets/adapters/ 下。"
+      "description": "解析器文件名，固定为 parse.js（位于 systems/<id>/ 下）。"
+    },
+    "fixtures": {
+      "type": "object",
+      "required": ["page", "events"],
+      "properties": {
+        "page": { "type": "string", "pattern": "^[A-Za-z0-9._-]+\\.html?$" },
+        "events": { "type": "string", "pattern": "^[A-Za-z0-9._-]+\\.json$" }
+      },
+      "additionalProperties": false
     },
     "input": {
       "type": "object",
-      "required": ["html", "url", "hints"],
+      "required": ["url", "hints"],
       "properties": {
-        "html": { "type": "string" },
         "url": { "type": "string", "pattern": "^https?://" },
         "hints": { "type": "object" }
       },

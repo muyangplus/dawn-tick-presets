@@ -1,0 +1,29 @@
+{
+  "id": "jwglxt",
+  "name": "正方教务",
+  "version": "1.0.0",
+  "aliases": [
+    "jwglxt",
+    "正方教务"
+  ],
+  "detect": {
+    "markers": [
+      "jwglxt",
+      "xskb_list",
+      "timetable_con",
+      "kbgrid_table"
+    ],
+    "timetableTableIds": [
+      "kbtable"
+    ],
+    "timetableTableClasses": [
+      "kb",
+      "timetable",
+      "schedule",
+      "skb"
+    ],
+    "gridCellIdPatterns": [
+      "\\d{1,2}[-_]\\d{1,2}"
+    ]
+  }
+}

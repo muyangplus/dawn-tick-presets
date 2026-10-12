@@ -1,13 +1,14 @@
 /**
- * jwglxt.js —— 正方教务课表适配器（最小可运行示例）
+ * parse.js —— 正方教务课表解析器（最小可运行示例）
  *
- * 契约（详见 presets/adapters/README.md）：
+ * 契约（详见 sandbox/adapter-contract.md）：
  *   - 唯一导出：export function parse({ html, url, hints })
  *   - 输入只读，禁止任何 IO / 网络 / 动态求值
  *   - 必须纯函数式返回：{ events: [{ title, dayOfWeek, periodStart, periodEnd, room, teacher, weeks }] }
+ *   - 有 parse.js 就必须有 fixtures/（页面样本 + 期望事件）
  *
  * 本示例只做最小实现：从正方课表页的 kbtable 里抓取形如 id="1-2" 的格子，
- * 产出 1-2 条事件用于演示。生产级适配器请自行补齐周次解析、多时段合并等逻辑。
+ * 产出 1-2 条事件用于演示。生产级解析器请自行补齐周次解析、多时段合并等逻辑。
  */
 
 /** 从一段 HTML 里剥掉标签，返回纯文本（用于格子内容）。 */

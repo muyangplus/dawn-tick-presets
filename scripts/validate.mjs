@@ -2,11 +2,13 @@
 /**
  * validate.mjs —— 仓库全量校验（CI 必跑）
  *
- * 四大类检查：
+ * 检查项：
  *   A. JSON Schema 校验（scripts/lib/schema.mjs，零依赖子集校验器）
- *   B. 语义校验（作息时间、教务系统字段与正则合法性）
- *   C. 跨文件一致性（systems 的 id 集合 vs SCHOOL_SYSTEM_IDS）
- *   D. 安全扫描（适配器静态禁用检测 + 沙箱运行冒烟）
+ *   B. 语义校验（作息时间、教务系统字段与正则合法性、学校覆盖语义）
+ *   C. 跨文件一致性（schools → systems 引用、index.json 与实际目录一致）
+ *   D. 夹具硬规则（有 parse.js 就必须有非空 fixtures/，且 ≤1 个解析器）
+ *   E. 安全扫描（systems/<id>/parse.js 静态禁用检测 + 沙箱运行冒烟）
+ *   F. 版本一致性（version.json）
  *
  * 任一错误 → 非 0 退出。用法：
  *   node scripts/validate.mjs              # 校验默认仓库根（脚本上一级）
@@ -17,15 +19,22 @@
 import { readFileSync, readdirSync, existsSync, statSync } from 'node:fs';
 import { join, relative, basename, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { isDeepStrictEqual } from 'node:util';
 import { validateSchema, formatPath } from './lib/schema.mjs';
+import { compileSystemConfig } from './lib/legacy.mjs';
 import { runAdapterSandbox, SANDBOX_LIMITS } from './sandbox-run.mjs';
 
 export const SCHOOL_SYSTEM_IDS = ['jwglxt', 'qzdatasource', 'urp', 'other'];
 export const SEMVER_RE = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
 export const HHMM_RE = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
 
+/** fixtures/ 里允许出现的扩展名（页面样本、期望事件、说明）。 */
+export const FIXTURE_EXTS = ['.html', '.htm', '.json', '.md'];
+/** school-config.json 允许的键（写死语义，见 README 与 schema/school-config.schema.json）。 */
+export const SCHOOL_CONFIG_KEYS = ['system', 'login', 'params', 'detect'];
+
 /**
- * 适配器安全扫描的禁用模式表。
+ * 解析器安全扫描的禁用模式表。
  * 每条：{ id, re, label }，re 命中即报错并给出文件与行号。
  * 注意：静态扫描覆盖源码文本；运行期约束由 scripts/sandbox-run.mjs 的受限子进程施加。
  */
@@ -52,7 +61,7 @@ export const FORBIDDEN_PATTERNS = [
   { id: 'set-interval', re: /setInterval\s*\(/, label: 'setInterval(（无限定时器）' },
 ];
 
-/** 适配器唯一允许的导出形式。 */
+/** 解析器唯一允许的导出形式。 */
 export const ADAPTER_EXPORT_RE = /^\s*export\s+function\s+parse\s*\(\s*\{[^}]*\}\s*\)\s*\{/m;
 /** 除 parse 外任何 export / module.exports / exports. 都视为越界。 */
 export const EXTRA_EXPORT_RE = /^\s*export\b(?!\s+function\s+parse\s*[({])/m;
@@ -68,7 +77,7 @@ const RESET = '\u001b[0m';
 /**
  * 把注释替换成等量空白（保留行号与列位置），避免中文注释里出现
  * 「net / fs」等词造成误报。字符串字面量不做特殊处理：
- * 适配器里出现这些词本身就可疑，宁可让贡献者改写法。
+ * 解析器里出现这些词本身就可疑，宁可让贡献者改写法。
  */
 export function stripComments(source) {
   const blank = (text) => text.replace(/[^\n]/g, ' ');
@@ -88,7 +97,7 @@ export class Report {
   }
 
   section(title) {
-    // 同名分区复用，避免 checkSystems 与 checkSystemsCrossFile 产生两个同名小节
+    // 同名分区复用，避免多个检查函数产生多个同名小节
     let entry = this.sections.find((item) => item.title === title);
     if (entry === undefined) {
       entry = { title, lines: [] };
@@ -143,7 +152,7 @@ function readJson(file) {
   return JSON.parse(readFileSync(file, 'utf8'));
 }
 
-function listJsonFiles(dir) {
+export function listJsonFiles(dir) {
   if (!existsSync(dir)) return [];
   return readdirSync(dir)
     .filter((name) => name.endsWith('.json'))
@@ -151,10 +160,17 @@ function listJsonFiles(dir) {
     .map((name) => join(dir, name));
 }
 
-function listAdapterFiles(dir) {
+export function listDirs(dir) {
   if (!existsSync(dir)) return [];
   return readdirSync(dir)
-    .filter((name) => name.endsWith('.js') && statSync(join(dir, name)).isFile())
+    .filter((name) => statSync(join(dir, name)).isDirectory())
+    .sort();
+}
+
+export function listFiles(dir) {
+  if (!existsSync(dir)) return [];
+  return readdirSync(dir)
+    .filter((name) => statSync(join(dir, name)).isFile())
     .sort()
     .map((name) => join(dir, name));
 }
@@ -168,87 +184,164 @@ function hhmmToMinutes(text) {
   return hour * 60 + minute;
 }
 
-/** A + B：作息时间表 Schema 与语义。 */
-export function checkTimetables(root, report) {
-  const dir = join(root, 'presets', 'timetables');
-  const section = report.section('A/B. 作息时间表（Schema + 语义）');
-  const schemaPath = join(root, 'schema', 'timetables.schema.json');
-  if (!existsSync(schemaPath)) {
-    section.fail(`缺少 schema 文件：${rel(root, schemaPath)}`);
-    return [];
+function loadSchema(root, report, section, name) {
+  const file = join(root, 'schema', `${name}.schema.json`);
+  if (!existsSync(file)) {
+    section.fail(`缺少 schema 文件：schema/${name}.schema.json`);
+    return undefined;
   }
-  const schema = readJson(schemaPath);
-  const files = listJsonFiles(dir);
-  if (files.length === 0) {
-    section.fail(`目录为空或不存在：presets/timetables/`);
+  try {
+    return readJson(file);
+  } catch (error) {
+    section.fail(`schema/${name}.schema.json 解析失败（${error.message}）`);
+    return undefined;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* A/B：作息时间表（schools/<dir>/timetable.json）                       */
+/* ------------------------------------------------------------------ */
+
+/**
+ * 校验全部学校目录：meta.json / timetable.json / config.json。
+ * @returns {Array<object>} 解析出的学校文档
+ */
+export function checkTimetables(root, report) {
+  const dir = join(root, 'presets', 'schools');
+  const section = report.section('A/B. 学校目录（meta / timetable / config）');
+  const metaSchema = loadSchema(root, report, section, 'school-meta');
+  const timetableSchema = loadSchema(root, report, section, 'timetable');
+  const configSchema = loadSchema(root, report, section, 'school-config');
+  const dirs = listDirs(dir);
+  if (dirs.length === 0) {
+    section.fail('目录为空或不存在：presets/schools/');
     return [];
   }
   const docs = [];
-  for (const file of files) {
-    const name = rel(root, file);
-    let data;
+  for (const dirName of dirs) {
+    const schoolDir = join(dir, dirName);
+    const metaFile = join(schoolDir, 'meta.json');
+    const timetableFile = join(schoolDir, 'timetable.json');
+    const configFile = join(schoolDir, 'config.json');
+    const prefix = `presets/schools/${dirName}`;
+    if (!existsSync(metaFile)) {
+      section.fail(`${prefix}/：缺少 meta.json`);
+      continue;
+    }
+    if (!existsSync(timetableFile)) {
+      section.fail(`${prefix}/：缺少 timetable.json`);
+      continue;
+    }
+
+    let meta;
+    let timetable;
     try {
-      data = readJson(file);
+      meta = readJson(metaFile);
     } catch (error) {
-      section.fail(`${name}：JSON 解析失败（${error.message}）`);
+      section.fail(`${prefix}/meta.json：JSON 解析失败（${error.message}）`);
       continue;
     }
-    docs.push({ file, name, data });
-
-    const schemaErrors = validateSchema(data, schema);
-    if (schemaErrors.length > 0) {
-      for (const error of schemaErrors) section.fail(`${name} Schema：${error.path} ${error.message}`);
+    try {
+      timetable = readJson(timetableFile);
+    } catch (error) {
+      section.fail(`${prefix}/timetable.json：JSON 解析失败（${error.message}）`);
       continue;
     }
-    section.ok(`${name} Schema 通过`);
 
-    const expectedId = basename(file, '.json');
-    if (data.id !== expectedId) {
-      section.fail(`${name}：文件内 id "${data.id}" 与文件名 "${expectedId}" 不一致`);
+    const doc = { dirName, prefix, meta, timetable, config: undefined };
+    docs.push(doc);
+
+    // --- meta.json ---
+    const metaErrors = validateSchema(meta, metaSchema);
+    if (metaErrors.length > 0) {
+      for (const error of metaErrors) section.fail(`${prefix}/meta.json Schema：${error.path} ${error.message}`);
     } else {
-      section.ok(`${name}：id 与文件名一致（${data.id}）`);
+      section.ok(`${prefix}/meta.json Schema 通过（id=${meta.id}、name=${meta.name}）`);
+    }
+    if (meta.generic === true && timetable.id !== 'default') {
+      section.fail(`${prefix}/meta.json：generic 为 true 时 timetable.id 必须是 "default"，实际是 "${timetable.id}"`);
     }
 
-    const periods = data.periods;
+    // --- config.json（语义写死：只允许 system/login/params/detect） ---
+    if (existsSync(configFile)) {
+      let config;
+      try {
+        config = readJson(configFile);
+      } catch (error) {
+        section.fail(`${prefix}/config.json：JSON 解析失败（${error.message}）`);
+        config = undefined;
+      }
+      if (config !== undefined) {
+        doc.config = config;
+        const unknown = Object.keys(config).filter((key) => !SCHOOL_CONFIG_KEYS.includes(key));
+        if (unknown.length > 0) {
+          section.fail(`${prefix}/config.json：未知键 ${unknown.join(', ')}（只允许 ${SCHOOL_CONFIG_KEYS.join(' / ')}）`);
+        }
+        const configErrors = validateSchema(config, configSchema);
+        if (configErrors.length > 0) {
+          for (const error of configErrors) section.fail(`${prefix}/config.json Schema：${error.path} ${error.message}`);
+        } else {
+          section.ok(`${prefix}/config.json Schema 通过（键：${Object.keys(config).join(', ') || '无'}）`);
+        }
+        if (config.system !== undefined && meta.system !== undefined && config.system !== meta.system) {
+          section.warn(
+            `${prefix}/config.json：system="${config.system}" 覆盖 meta.json 的 "${meta.system}"` +
+            '（index.json 以 meta.json 为准，覆盖只影响客户端运行时）',
+          );
+        }
+      }
+    } else if (meta.system !== null && meta.system !== undefined) {
+      section.info(`${prefix}/：没有 config.json（可选；该校直接沿用 systems/${meta.system}/ 的系统级配置）`);
+    }
+
+    // --- timetable.json ---
+    const schemaErrors = validateSchema(timetable, timetableSchema);
+    if (schemaErrors.length > 0) {
+      for (const error of schemaErrors) section.fail(`${prefix}/timetable.json Schema：${error.path} ${error.message}`);
+      continue;
+    }
+    section.ok(`${prefix}/timetable.json Schema 通过`);
+
+    const periods = timetable.periods;
     const numbers = periods.map((period) => period.periodNo);
     const uniqueNumbers = new Set(numbers);
     if (uniqueNumbers.size !== numbers.length) {
       const duplicated = numbers.filter((number, index) => numbers.indexOf(number) !== index);
-      section.fail(`${name}：periodNo 重复（${[...new Set(duplicated)].join(', ')}）`);
+      section.fail(`${prefix}/timetable.json：periodNo 重复（${[...new Set(duplicated)].join(', ')}）`);
     } else {
-      section.ok(`${name}：periodNo 唯一（${numbers.length} 节）`);
+      section.ok(`${prefix}/timetable.json：periodNo 唯一（${numbers.length} 节）`);
     }
 
     let ascending = true;
     for (let index = 1; index < numbers.length; index += 1) {
       if (numbers[index] <= numbers[index - 1]) {
         ascending = false;
-        section.fail(`${name}：periodNo 未严格递增（第 ${index + 1} 项 ${numbers[index]} 不大于前一项 ${numbers[index - 1]}）`);
+        section.fail(`${prefix}/timetable.json：periodNo 未严格递增（第 ${index + 1} 项 ${numbers[index]} 不大于前一项 ${numbers[index - 1]}）`);
       }
     }
     const strictlySequential = numbers.every((number, index) => number === index + 1);
     if (ascending && !strictlySequential) {
-      section.fail(`${name}：periodNo 应从 1 起连续无跳号，实际为 [${numbers.join(', ')}]`);
+      section.fail(`${prefix}/timetable.json：periodNo 应从 1 起连续无跳号，实际为 [${numbers.join(', ')}]`);
     } else if (ascending) {
-      section.ok(`${name}：periodNo 严格递增且从 1 起连续`);
+      section.ok(`${prefix}/timetable.json：periodNo 严格递增且从 1 起连续`);
     }
 
     const timeFormatOk = periods.every((period) => HHMM_RE.test(period.start) && HHMM_RE.test(period.end));
     if (!timeFormatOk) {
       const bad = periods.find((period) => !HHMM_RE.test(period.start) || !HHMM_RE.test(period.end));
-      section.fail(`${name}：第 ${bad.periodNo} 节时间格式非法（start=${bad.start}、end=${bad.end}），必须是 HH:MM（24 小时制）`);
+      section.fail(`${prefix}/timetable.json：第 ${bad.periodNo} 节时间格式非法（start=${bad.start}、end=${bad.end}），必须是 HH:MM（24 小时制）`);
     } else {
-      section.ok(`${name}：全部时间严格符合 HH:MM`);
+      section.ok(`${prefix}/timetable.json：全部时间严格符合 HH:MM`);
     }
 
     let durationOk = true;
     for (const period of periods) {
       if (hhmmToMinutes(period.end) <= hhmmToMinutes(period.start)) {
         durationOk = false;
-        section.fail(`${name}：第 ${period.periodNo} 节 end(${period.end}) 必须晚于 start(${period.start})`);
+        section.fail(`${prefix}/timetable.json：第 ${period.periodNo} 节 end(${period.end}) 必须晚于 start(${period.start})`);
       }
     }
-    if (durationOk) section.ok(`${name}：每节 end > start`);
+    if (durationOk) section.ok(`${prefix}/timetable.json：每节 end > start`);
 
     let overlapOk = true;
     for (let index = 1; index < periods.length; index += 1) {
@@ -257,64 +350,22 @@ export function checkTimetables(root, report) {
       if (hhmmToMinutes(current.start) < hhmmToMinutes(previous.end)) {
         overlapOk = false;
         section.fail(
-          `${name}：第 ${previous.periodNo} 节（结束 ${previous.end}）与第 ${current.periodNo} 节（开始 ${current.start}）时间重叠`,
+          `${prefix}/timetable.json：第 ${previous.periodNo} 节（结束 ${previous.end}）与第 ${current.periodNo} 节（开始 ${current.start}）时间重叠`,
         );
       }
     }
-    if (overlapOk) section.ok(`${name}：相邻节次不重叠`);
+    if (overlapOk) section.ok(`${prefix}/timetable.json：相邻节次不重叠`);
   }
   return docs;
 }
 
-/**
- * A：适配器自检用例（test/conformance/*.json）必须符合 conformance schema，
- * 且引用的适配器文件必须真实存在。
- */
-export function checkConformance(root, report) {
-  const dir = join(root, 'test', 'conformance');
-  const section = report.section('A. 适配器自检用例（Schema）');
-  const schemaPath = join(root, 'schema', 'conformance.schema.json');
-  if (!existsSync(schemaPath)) {
-    section.fail(`缺少 schema 文件：${rel(root, schemaPath)}`);
-    return [];
-  }
-  const schema = readJson(schemaPath);
-  const files = listJsonFiles(dir);
-  if (files.length === 0) {
-    section.warn('test/conformance/ 下没有自检用例');
-    return [];
-  }
-  const cases = [];
-  for (const file of files) {
-    const name = rel(root, file);
-    let data;
-    try {
-      data = readJson(file);
-    } catch (error) {
-      section.fail(`${name}：JSON 解析失败（${error.message}）`);
-      continue;
-    }
-    const schemaErrors = validateSchema(data, schema);
-    if (schemaErrors.length > 0) {
-      for (const error of schemaErrors) section.fail(`${name} Schema：${error.path} ${error.message}`);
-      continue;
-    }
-    section.ok(`${name} Schema 通过（system=${data.system}、adapter=${data.adapter}、minEvents=${data.expect.minEvents}）`);
-    const adapterPath = join(root, 'presets', 'adapters', data.adapter);
-    if (!existsSync(adapterPath)) {
-      section.fail(`${name}：引用的适配器不存在 presets/adapters/${data.adapter}`);
-    } else {
-      section.ok(`${name}：引用的适配器存在（presets/adapters/${data.adapter}）`);
-    }
-    cases.push({ file, name, data });
-  }
-  return cases;
-}
+/* ------------------------------------------------------------------ */
+/* A/B/D：教务系统（systems/<id>/）                                     */
+/* ------------------------------------------------------------------ */
 
 /**
- * 跨文件一致性 + other 语义：presets/systems 的 id 集合必须与 SCHOOL_SYSTEM_IDS 一致。
- * 抽成独立函数，便于测试直接调用（跳过 schema 层单独验证语义层）。
- * @param {Array<{name: string, data: object}>} docs 已解析的系统配置
+ * 跨文件一致性 + other 语义：systems 的 id 集合必须与 SCHOOL_SYSTEM_IDS 一致。
+ * @param {Array<{name: string, data: object}>} docs 已解析的系统元数据（meta.json）
  * @param {string[]} expectedIds 期望的 id 集合
  * @param {Report} report
  */
@@ -338,7 +389,7 @@ export function checkSystemsCrossFile(docs, expectedIds, report) {
   if (missing.length > 0) section.fail(`跨文件一致性：缺少系统配置 ${missing.join(', ')}`);
   if (extra.length > 0) section.fail(`跨文件一致性：存在 SCHOOL_SYSTEM_IDS 之外的系统 ${extra.join(', ')}`);
   if (missing.length === 0 && extra.length === 0) {
-    section.ok(`跨文件一致性：presets/systems 的 id 集合与 SCHOOL_SYSTEM_IDS 完全一致（${idSet.join(', ')}）`);
+    section.ok(`跨文件一致性：systems 的 id 集合与 SCHOOL_SYSTEM_IDS 完全一致（${idSet.join(', ')}）`);
   }
 
   const other = docs.find((doc) => doc.data.id === 'other');
@@ -354,78 +405,122 @@ export function checkSystemsCrossFile(docs, expectedIds, report) {
   }
 }
 
-/** A + B + C：教务系统配置。 */
+/**
+ * 读取并校验系统目录（meta/login/parse.js/fixtures）。
+ * @returns {Array<object>} 系统文档（含 dirName、meta、login、parserFile、fixtureFiles）
+ */
 export function checkSystems(root, report) {
   const dir = join(root, 'presets', 'systems');
-  const section = report.section('A/B/C. 教务系统配置（Schema + 语义 + 跨文件一致性）');
-  const schemaPath = join(root, 'schema', 'systems.schema.json');
-  if (!existsSync(schemaPath)) {
-    section.fail(`缺少 schema 文件：${rel(root, schemaPath)}`);
-    return [];
-  }
-  const schema = readJson(schemaPath);
-  const files = listJsonFiles(dir);
-  if (files.length === 0) {
+  const section = report.section('A/B/C. 教务系统（meta / login / parse.js / fixtures）');
+  const metaSchema = loadSchema(root, report, section, 'system-meta');
+  const loginSchema = loadSchema(root, report, section, 'system-login');
+  const dirs = listDirs(dir);
+  if (dirs.length === 0) {
     section.fail('目录为空或不存在：presets/systems/');
     return [];
   }
-  const docs = [];
+  const systems = [];
   const seenIds = new Map();
-  for (const file of files) {
-    const name = rel(root, file);
-    let data;
+  for (const dirName of dirs) {
+    const systemDir = join(dir, dirName);
+    const metaFile = join(systemDir, 'meta.json');
+    const loginFile = join(systemDir, 'login.json');
+    const parserFile = join(systemDir, 'parse.js');
+    const fixturesDir = join(systemDir, 'fixtures');
+    const prefix = `presets/systems/${dirName}`;
+
+    if (!existsSync(metaFile)) {
+      section.fail(`${prefix}/：缺少 meta.json`);
+      continue;
+    }
+    if (!existsSync(loginFile)) {
+      section.fail(`${prefix}/：缺少 login.json`);
+      continue;
+    }
+
+    let meta;
+    let login;
     try {
-      data = readJson(file);
+      meta = readJson(metaFile);
     } catch (error) {
-      section.fail(`${name}：JSON 解析失败（${error.message}）`);
+      section.fail(`${prefix}/meta.json：JSON 解析失败（${error.message}）`);
       continue;
     }
-    docs.push({ file, name, data });
-
-    const schemaErrors = validateSchema(data, schema);
-    if (schemaErrors.length > 0) {
-      for (const error of schemaErrors) section.fail(`${name} Schema：${error.path} ${error.message}`);
+    try {
+      login = readJson(loginFile);
+    } catch (error) {
+      section.fail(`${prefix}/login.json：JSON 解析失败（${error.message}）`);
       continue;
     }
-    section.ok(`${name} Schema 通过`);
 
-    const expectedId = basename(file, '.json');
-    if (data.id !== expectedId) {
-      section.fail(`${name}：文件内 id "${data.id}" 与文件名 "${expectedId}" 不一致`);
-    }
-    if (seenIds.has(data.id)) {
-      section.fail(`${name}：系统 id "${data.id}" 与 ${seenIds.get(data.id)} 重复`);
+    const parserFiles = listFiles(systemDir).filter((file) => file.endsWith('.js'));
+    const fixtureFiles = existsSync(fixturesDir) ? listFiles(fixturesDir) : [];
+    const system = {
+      dirName,
+      prefix,
+      meta,
+      login,
+      metaFile,
+      loginFile,
+      parserFiles,
+      parserFile: existsSync(parserFile) ? parserFile : undefined,
+      fixturesDir,
+      fixtureFiles,
+    };
+    systems.push(system);
+
+    // --- meta.json ---
+    const metaErrors = validateSchema(meta, metaSchema);
+    if (metaErrors.length > 0) {
+      for (const error of metaErrors) section.fail(`${prefix}/meta.json Schema：${error.path} ${error.message}`);
     } else {
-      seenIds.set(data.id, name);
-      section.ok(`${name}：id 唯一（${data.id}）`);
+      section.ok(`${prefix}/meta.json Schema 通过（id=${meta.id}）`);
     }
-
-    if (!SCHOOL_SYSTEM_IDS.includes(data.id)) {
-      section.fail(`${name}：未知系统 id "${data.id}"，不在 SCHOOL_SYSTEM_IDS（${SCHOOL_SYSTEM_IDS.join('/')}）内`);
+    if (meta.id !== dirName) {
+      section.fail(`${prefix}/meta.json：文件内 id "${meta.id}" 与目录名 "${dirName}" 不一致`);
     }
-
-    if (!data.entryPath.startsWith('/')) {
-      section.fail(`${name}：entryPath "${data.entryPath}" 必须以 / 开头`);
-    } else if (/^\/\//.test(data.entryPath) || /^[a-z]+:\/\//i.test(data.entryPath)) {
-      section.fail(`${name}：entryPath "${data.entryPath}" 只能是路径，不能含协议或域名`);
+    if (seenIds.has(meta.id)) {
+      section.fail(`${prefix}/meta.json：系统 id "${meta.id}" 与 ${seenIds.get(meta.id)} 重复`);
     } else {
-      section.ok(`${name}：entryPath 以 / 开头（${data.entryPath}）`);
+      seenIds.set(meta.id, `${prefix}/meta.json`);
+      section.ok(`${prefix}/meta.json：id 唯一（${meta.id}）`);
+    }
+    if (!SCHOOL_SYSTEM_IDS.includes(meta.id)) {
+      section.fail(`${prefix}/meta.json：未知系统 id "${meta.id}"，不在 SCHOOL_SYSTEM_IDS（${SCHOOL_SYSTEM_IDS.join('/')}）内`);
     }
 
-    for (const key of ['timetableTableIds', 'timetableTableClasses']) {
-      const value = data.detect[key];
-      if (!Array.isArray(value) || !value.every((item) => typeof item === 'string')) {
-        section.fail(`${name}：detect.${key} 必须是字符串数组`);
+    // --- login.json ---
+    const loginErrors = validateSchema(login, loginSchema);
+    if (loginErrors.length > 0) {
+      for (const error of loginErrors) section.fail(`${prefix}/login.json Schema：${error.path} ${error.message}`);
+    } else {
+      section.ok(`${prefix}/login.json Schema 通过（entryPath=${login.entryPath}）`);
+    }
+    if (typeof login.entryPath === 'string') {
+      if (!login.entryPath.startsWith('/')) {
+        section.fail(`${prefix}/login.json：entryPath "${login.entryPath}" 必须以 / 开头`);
+      } else if (/^\/\//.test(login.entryPath) || /^[a-z]+:\/\//i.test(login.entryPath)) {
+        section.fail(`${prefix}/login.json：entryPath "${login.entryPath}" 只能是路径，不能含协议或域名`);
+      } else {
+        section.ok(`${prefix}/login.json：entryPath 以 / 开头（${login.entryPath}）`);
       }
     }
-    if (Array.isArray(data.detect.timetableTableIds) && Array.isArray(data.detect.timetableTableClasses)) {
-      section.ok(`${name}：timetableTableIds / timetableTableClasses 均为字符串数组`);
-    }
 
+    // --- detect 语义 ---
+    const detect = meta.detect ?? {};
+    for (const key of ['timetableTableIds', 'timetableTableClasses']) {
+      const value = detect[key];
+      if (!Array.isArray(value) || !value.every((item) => typeof item === 'string')) {
+        section.fail(`${prefix}/meta.json：detect.${key} 必须是字符串数组`);
+      }
+    }
+    if (Array.isArray(detect.timetableTableIds) && Array.isArray(detect.timetableTableClasses)) {
+      section.ok(`${prefix}/meta.json：timetableTableIds / timetableTableClasses 均为字符串数组`);
+    }
     for (const key of ['markers', 'gridCellIdPatterns']) {
-      const value = data.detect[key];
+      const value = detect[key];
       if (!Array.isArray(value)) {
-        section.fail(`${name}：detect.${key} 必须是数组`);
+        section.fail(`${prefix}/meta.json：detect.${key} 必须是数组`);
         continue;
       }
       let allCompile = true;
@@ -434,27 +529,248 @@ export function checkSystems(root, report) {
           new RegExp(pattern);
         } catch (error) {
           allCompile = false;
-          section.fail(`${name}：detect.${key} 中的 "${pattern}" 不是合法正则（${error.message}）`);
+          section.fail(`${prefix}/meta.json：detect.${key} 中的 "${pattern}" 不是合法正则（${error.message}）`);
         }
       }
-      if (allCompile) section.ok(`${name}：detect.${key} 全部可由 new RegExp 编译（${value.length} 条）`);
+      if (allCompile) section.ok(`${prefix}/meta.json：detect.${key} 全部可由 new RegExp 编译（${value.length} 条）`);
+    }
+
+    // --- D：解析器与夹具的硬规则 ---
+    if (parserFiles.length > 1) {
+      section.fail(
+        `${prefix}/：只允许一个解析器 parse.js，实际发现 ${parserFiles.map((file) => basename(file)).join(', ')}`,
+      );
+    }
+    if (existsSync(parserFile)) {
+      const pages = fixtureFiles.filter((file) => /\.html?$/.test(file));
+      const eventFiles = fixtureFiles.filter((file) => file.endsWith('.json'));
+      if (fixtureFiles.length === 0) {
+        section.fail(
+          `${prefix}/：存在 parse.js 但 fixtures/ 为空或不存在 —— 有解析器就必须有夹具（至少 1 个页面样本 + 1 个期望事件文件）`,
+        );
+      } else if (pages.length === 0) {
+        section.fail(`${prefix}/fixtures/：缺少页面样本（至少 1 个 .html / .htm，用来喂给沙箱跑 parse.js）`);
+      } else if (eventFiles.length === 0) {
+        section.fail(`${prefix}/fixtures/：缺少期望事件文件（至少 1 个 .json）`);
+      } else {
+        section.ok(
+          `${prefix}/：夹具齐全（页面样本 ${pages.map((file) => basename(file)).join(', ')}；期望事件 ${eventFiles.map((file) => basename(file)).join(', ')}）`,
+        );
+      }
+      const badExt = fixtureFiles.filter((file) => !FIXTURE_EXTS.includes(file.slice(file.lastIndexOf('.')).toLowerCase()));
+      for (const file of badExt) {
+        section.warn(`${rel(root, file)}：fixtures/ 里出现了非预期扩展名（允许 ${FIXTURE_EXTS.join(' / ')}）`);
+      }
+    } else if (fixtureFiles.length > 0) {
+      section.info(`${prefix}/：没有 parse.js（夹具可选，${fixtureFiles.length} 个文件）`);
+    } else {
+      section.info(`${prefix}/：没有 parse.js（夹具可选；有解析器时才是必填）`);
     }
   }
 
-  checkSystemsCrossFile(docs, SCHOOL_SYSTEM_IDS, report);
-  return docs;
+  checkSystemsCrossFile(
+    systems.map((system) => ({ name: `${system.prefix}/meta.json`, data: system.meta })),
+    SCHOOL_SYSTEM_IDS,
+    report,
+  );
+  return systems;
 }
 
-/** D1：适配器静态安全扫描。 */
-export function checkAdapters(root, report) {
-  const dir = join(root, 'presets', 'adapters');
-  const section = report.section('D1. 适配器静态安全扫描');
-  const files = listAdapterFiles(dir);
-  if (files.length === 0) {
-    section.warn('presets/adapters/ 下没有 .js 适配器文件');
+/**
+ * A：适配器一致性用例（systems/<id>/fixtures/*.json）。
+ * 每条用例必须符合 system-fixture schema，引用的页面样本必须真实存在。
+ */
+export function checkConformance(root, report) {
+  const section = report.section('A. 解析器一致性用例（systems/*/fixtures/）');
+  const schema = loadSchema(root, report, section, 'system-fixture');
+  const cases = [];
+  const systemsDir = join(root, 'presets', 'systems');
+  for (const dirName of listDirs(systemsDir)) {
+    const fixturesDir = join(systemsDir, dirName, 'fixtures');
+    if (!existsSync(fixturesDir)) continue;
+    for (const file of listFiles(fixturesDir)) {
+      if (!file.endsWith('.json')) continue;
+      const name = rel(root, file);
+      let data;
+      try {
+        data = readJson(file);
+      } catch (error) {
+        section.fail(`${name}：JSON 解析失败（${error.message}）`);
+        continue;
+      }
+      // fixtures/ 里允许放任意说明性 JSON：只有带 input/expect 的才算一致性用例
+      if (data === null || typeof data !== 'object' || data.input === undefined) {
+        section.info(`${name}：不是一致性用例（没有 input 字段），跳过`);
+        continue;
+      }
+      const schemaErrors = validateSchema(data, schema);
+      if (schemaErrors.length > 0) {
+        for (const error of schemaErrors) section.fail(`${name} Schema：${error.path} ${error.message}`);
+        continue;
+      }
+      if (data.system !== dirName) {
+        section.fail(`${name}：system "${data.system}" 与所在目录 "systems/${dirName}/" 不一致`);
+      }
+      const pagePath = join(fixturesDir, data.fixtures.page);
+      if (!existsSync(pagePath)) {
+        section.fail(`${name}：fixtures.page 指向的页面样本不存在（systems/${dirName}/fixtures/${data.fixtures.page}）`);
+      } else {
+        section.ok(`${name}：用例合法（system=${data.system}、minEvents=${data.expect.minEvents}、页面样本 ${data.fixtures.page}）`);
+      }
+
+      // 期望事件文件与用例里内联的 expect 必须一致（避免两份期望各说各话）
+      const eventsPath = join(fixturesDir, data.fixtures.events);
+      if (!existsSync(eventsPath)) {
+        section.fail(`${name}：fixtures.events 指向的期望事件文件不存在（systems/${dirName}/fixtures/${data.fixtures.events}）`);
+      } else {
+        let events;
+        try {
+          events = readJson(eventsPath);
+        } catch (error) {
+          section.fail(`${rel(root, eventsPath)}：JSON 解析失败（${error.message}）`);
+          events = undefined;
+        }
+        if (events !== undefined) {
+          const eventErrors = validateSchema(events, schema);
+          if (eventErrors.length > 0) {
+            for (const error of eventErrors) section.fail(`${rel(root, eventsPath)} Schema：${error.path} ${error.message}`);
+          } else if (events.id !== data.id) {
+            section.fail(`${rel(root, eventsPath)}：id "${events.id}" 与用例 ${rel(root, file)} 的 id "${data.id}" 不一致`);
+          } else if (events.system !== data.system) {
+            section.fail(`${rel(root, eventsPath)}：system "${events.system}" 与用例 ${rel(root, file)} 的 system "${data.system}" 不一致`);
+          } else {
+            const expectedList = events.expect.events ?? [];
+            if (data.expect.minEvents > expectedList.length) {
+              section.fail(
+                `${rel(root, file)}：expect.minEvents=${data.expect.minEvents} 大于 ${data.fixtures.events} 里声明的期望事件数 ${expectedList.length}`,
+              );
+            } else if (!isDeepStrictEqual(data.expect.events ?? [], expectedList)) {
+              section.fail(
+                `${rel(root, file)}：内联的 expect.events 与 ${data.fixtures.events} 里的期望事件不一致（两份期望必须完全相同）`,
+              );
+            } else {
+              section.ok(
+                `${rel(root, eventsPath)}：期望事件与用例一致（minEvents=${data.expect.minEvents}、期望 ${expectedList.length} 条）`,
+              );
+            }
+          }
+        }
+      }
+      cases.push({ file, name, dirName, fixturesDir, data });
+    }
+  }
+  if (cases.length === 0) section.warn('没有找到任何一致性用例（systems/*/fixtures/*.json）');
+  return cases;
+}
+
+/**
+ * C：presets/index.json 必须与实际目录内容一致（生成物，禁止手改）。
+ */
+export function checkIndex(root, report, { schools, systems } = {}) {
+  const section = report.section('C. index.json（生成物一致性）');
+  const file = join(root, 'presets', 'index.json');
+  if (!existsSync(file)) {
+    section.fail('缺少 presets/index.json（生成物；请运行 node scripts/snapshot.mjs）');
+    return undefined;
+  }
+  let index;
+  try {
+    index = readJson(file);
+  } catch (error) {
+    section.fail(`presets/index.json 解析失败（${error.message}）`);
+    return undefined;
+  }
+  const schema = loadSchema(root, report, section, 'index');
+  const schemaErrors = validateSchema(index, schema);
+  if (schemaErrors.length > 0) {
+    for (const error of schemaErrors) section.fail(`presets/index.json Schema：${error.path} ${error.message}`);
+    return index;
+  }
+  section.ok('presets/index.json Schema 通过（_generated: true）');
+  if (index._generated !== true) {
+    section.fail('presets/index.json：_generated 必须为 true（本文件是生成物，禁止手改）');
+  }
+
+  const versionFile = join(root, 'version.json');
+  if (existsSync(versionFile)) {
+    const versionData = readJson(versionFile);
+    if (index.version !== versionData.version) {
+      section.fail(`presets/index.json：version "${index.version}" 与 version.json 的 "${versionData.version}" 不一致`);
+    } else {
+      section.ok(`presets/index.json：version 与 version.json 一致（${index.version}）`);
+    }
+    if (index.schemaVersion !== versionData.schemaVersion) {
+      section.fail(`presets/index.json：schemaVersion ${index.schemaVersion} 与 version.json 的 ${versionData.schemaVersion} 不一致`);
+    }
+  }
+
+  const expectedSchoolIds = (schools ?? []).map((school) => school.meta.id).sort();
+  const indexedSchoolIds = index.schools.map((school) => school.id).sort();
+  const schoolMissing = expectedSchoolIds.filter((id) => !indexedSchoolIds.includes(id));
+  const schoolExtra = indexedSchoolIds.filter((id) => !expectedSchoolIds.includes(id));
+  if (schoolMissing.length > 0) section.fail(`presets/index.json：缺少学校 ${schoolMissing.join(', ')}（目录里有但索引里没有）`);
+  if (schoolExtra.length > 0) section.fail(`presets/index.json：多余的学校 ${schoolExtra.join(', ')}（索引里有但目录里没有）`);
+  if (schoolMissing.length === 0 && schoolExtra.length === 0) {
+    section.ok(`presets/index.json：学校 id 集合与目录一致（${indexedSchoolIds.join(', ')}）`);
+  }
+
+  const expectedSystemIds = (systems ?? []).map((system) => system.meta.id).sort();
+  const indexedSystemIds = index.systems.map((system) => system.id).sort();
+  const systemMissing = expectedSystemIds.filter((id) => !indexedSystemIds.includes(id));
+  const systemExtra = indexedSystemIds.filter((id) => !expectedSystemIds.includes(id));
+  if (systemMissing.length > 0) section.fail(`presets/index.json：缺少系统 ${systemMissing.join(', ')}`);
+  if (systemExtra.length > 0) section.fail(`presets/index.json：多余的系统 ${systemExtra.join(', ')}`);
+  if (systemMissing.length === 0 && systemExtra.length === 0) {
+    section.ok(`presets/index.json：系统 id 集合与目录一致（${indexedSystemIds.join(', ')}）`);
+  }
+
+  for (const entry of index.schools) {
+    if (entry.system === null) continue;
+    if (!indexedSystemIds.includes(entry.system)) {
+      section.fail(`presets/index.json：学校 "${entry.id}" 引用的系统 "${entry.system}" 不在索引的系统列表里`);
+    }
+    if (!expectedSystemIds.includes(entry.system)) {
+      section.fail(`presets/index.json：学校 "${entry.id}" 引用的系统 "${entry.system}" 在 presets/systems/ 下不存在`);
+    }
+    if (entry.configPath !== null && !existsSync(join(root, entry.configPath))) {
+      section.fail(`presets/index.json：学校 "${entry.id}" 的 configPath 不存在（${entry.configPath}）`);
+    }
+    if (!existsSync(join(root, entry.timetablePath))) {
+      section.fail(`presets/index.json：学校 "${entry.id}" 的 timetablePath 不存在（${entry.timetablePath}）`);
+    }
+  }
+
+  // 系统引用必须是 meta + login 的真实编译结果（detect / entryPath / hint 不能凭空写）
+  for (const entry of index.systems) {
+    const system = (systems ?? []).find((item) => item.meta.id === entry.id);
+    if (system === undefined) continue;
+    const expected = compileSystemConfig({ meta: system.meta, login: system.login });
+    if (JSON.stringify(entry.detect) !== JSON.stringify(expected.detect)) {
+      section.fail(`presets/index.json：系统 "${entry.id}" 的 detect 与 meta.json 编译结果不一致`);
+    }
+    if (entry.entryPath !== expected.entryPath || entry.hint !== expected.hint) {
+      section.fail(`presets/index.json：系统 "${entry.id}" 的 entryPath/hint 与 login.json 不一致`);
+    }
+    if (entry.hasParser !== (system.parserFile !== undefined)) {
+      section.fail(`presets/index.json：系统 "${entry.id}" 的 hasParser 与实际文件不一致`);
+    }
+  }
+  section.ok('presets/index.json：系统引用与 meta.json / login.json 编译结果一致');
+  return index;
+}
+
+/** D1：解析器静态安全扫描（systems/<id>/parse.js）。 */
+export function checkAdapters(root, report, systems = []) {
+  const section = report.section('D. 解析器静态安全扫描');
+  const parserFiles = systems
+    .flatMap((system) => system.parserFiles)
+    .filter((file) => file.endsWith('.js'))
+    .sort();
+  if (parserFiles.length === 0) {
+    section.warn('presets/systems/*/parse.js：没有解析器文件');
     return [];
   }
-  for (const file of files) {
+  for (const file of parserFiles) {
     const name = rel(root, file);
     const raw = readFileSync(file, 'utf8');
     const source = stripComments(raw);
@@ -483,30 +799,31 @@ export function checkAdapters(root, report) {
     }
   }
   section.info('静态检查覆盖源码文本；运行期约束由 scripts/sandbox-run.mjs（受限子进程）施加。');
-  return files;
+  return parserFiles;
 }
 
-/** D2：在受限沙箱中冒烟运行每个适配器。 */
-export async function checkAdapterSandbox(root, report, adapterFiles) {
-  const section = report.section('D2. 适配器沙箱冒烟（受限子进程）');
+/** D2：在受限沙箱中冒烟运行每个解析器（用手里的夹具）。 */
+export async function checkAdapterSandbox(root, report, systems, cases, adapterFiles) {
+  const section = report.section('D2. 解析器沙箱冒烟（受限子进程）');
   if (adapterFiles.length === 0) {
-    section.warn('没有适配器可运行');
+    section.warn('没有解析器可运行');
     return;
   }
-  const conformanceDir = join(root, 'test', 'conformance');
-  const cases = existsSync(conformanceDir)
-    ? listJsonFiles(conformanceDir).map((file) => ({ file, data: readJson(file) }))
-    : [];
   for (const file of adapterFiles) {
-    const name = basename(file);
-    const testCase = cases.find((item) => item.data.adapter === name);
-    if (testCase === undefined) {
-      section.warn(`${rel(root, file)}：没有对应的 test/conformance 用例，跳过沙箱执行`);
+    const system = systems.find((item) => item.parserFile === file);
+    if (system === undefined) {
+      section.warn(`${rel(root, file)}：没有对应的系统目录，跳过沙箱执行`);
       continue;
     }
+    const testCase = cases.find((item) => item.dirName === system.dirName);
+    if (testCase === undefined) {
+      section.warn(`${rel(root, file)}：没有对应的 fixtures 一致性用例，跳过沙箱执行`);
+      continue;
+    }
+    const html = readFileSync(join(testCase.fixturesDir, testCase.data.fixtures.page), 'utf8');
     const result = await runAdapterSandbox({
       adapterPath: file,
-      input: testCase.data.input,
+      input: { html, url: testCase.data.input.url, hints: testCase.data.input.hints },
       expectedMinEvents: testCase.data.expect?.minEvents,
     });
     if (!result.ok) {
@@ -519,15 +836,26 @@ export async function checkAdapterSandbox(root, report, adapterFiles) {
       section.fail(`${rel(root, file)} 沙箱执行产出事件不足：期望至少 ${min} 条，实际 ${events.length} 条`);
       continue;
     }
+    // 夹具里声明的期望事件必须与真实产出**逐条一致**：这是「适配器 ↔ 页面样本」的一致性用例
+    const expectedFile = join(testCase.fixturesDir, testCase.data.fixtures.events);
+    const expected = existsSync(expectedFile) ? (readJson(expectedFile).expect?.events ?? []) : [];
+    if (expected.length > 0 && !isDeepStrictEqual(events, expected)) {
+      const different = expected.findIndex((event, index) => !isDeepStrictEqual(event, events[index]));
+      section.fail(
+        `${rel(root, file)} 沙箱产出与夹具 ${testCase.data.fixtures.events} 不一致：` +
+        `第 ${(different === -1 ? Math.min(events.length, expected.length) : different) + 1} 条不同（实际 ${events.length} 条、期望 ${expected.length} 条）`,
+      );
+      continue;
+    }
     section.ok(
-      `${rel(root, file)} 沙箱执行成功：${events.length} 条事件（用例 ${testCase.data.id}，${result.meta.durationMs}ms，权限参数 ${result.meta.permissionFlag}）`,
+      `${rel(root, file)} 沙箱执行成功：${events.length} 条事件与夹具逐条一致（用例 ${testCase.data.id}，${result.meta.durationMs}ms，权限参数 ${result.meta.permissionFlag}）`,
     );
   }
 }
 
-/** E：版本一致性。 */
+/** F：版本一致性。 */
 export function checkVersion(root, report) {
-  const section = report.section('E. 版本一致性（version.json）');
+  const section = report.section('F. 版本一致性（version.json）');
   const file = join(root, 'version.json');
   if (!existsSync(file)) {
     section.fail('缺少 version.json');
@@ -541,7 +869,7 @@ export function checkVersion(root, report) {
     return undefined;
   }
   if (typeof data.version !== 'string' || !SEMVER_RE.test(data.version)) {
-    section.fail(`version "${data.version}" 不是合法 SemVer（形如 1.0.0 / 1.1.0-rc.1）`);
+    section.fail(`version "${data.version}" 不是合法 SemVer（形如 0.1.0 / 1.1.0-rc.1）`);
   } else {
     section.ok(`version 是合法 SemVer：${data.version}`);
   }
@@ -584,16 +912,17 @@ export async function main(argv = process.argv.slice(2)) {
   const root = options.root ?? fileURLToPath(new URL('..', import.meta.url));
   const report = new Report();
 
-  checkTimetables(root, report);
-  checkSystems(root, report);
-  checkConformance(root, report);
-  const adapterFiles = checkAdapters(root, report);
+  const schools = checkTimetables(root, report);
+  const systems = checkSystems(root, report);
+  const cases = checkConformance(root, report);
+  const adapterFiles = checkAdapters(root, report, systems);
+  checkIndex(root, report, { schools, systems });
   checkVersion(root, report);
   if (options.scanOnly) {
-    const section = report.section('D2. 适配器沙箱冒烟（受限子进程）');
+    const section = report.section('D2. 解析器沙箱冒烟（受限子进程）');
     section.info('已通过 --scan-only 跳过');
   } else {
-    await checkAdapterSandbox(root, report, adapterFiles);
+    await checkAdapterSandbox(root, report, systems, cases, adapterFiles);
   }
 
   process.stdout.write(`${report.toText()}\n`);

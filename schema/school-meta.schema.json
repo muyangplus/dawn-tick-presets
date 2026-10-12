@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dawn-tick.dev/schema/school-meta.schema.json",
+  "title": "DawnTick 学校元数据（schools/<dir>/meta.json）",
+  "description": "描述一所学校：稳定 id、展示名、地区、类型、所用教务系统 id 与别名。system 为 null 表示不绑定教务系统（如通用作息）。",
+  "type": "object",
+  "required": ["id", "name", "system"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[a-z][a-z0-9_-]*$",
+      "description": "学校稳定标识（如 usts / default），也是对外暴露的作息表 id。"
+    },
+    "name": { "type": "string", "minLength": 1, "description": "中文展示名。" },
+    "region": { "type": "string", "minLength": 1, "description": "省份 / 地区，如「江苏」。" },
+    "type": { "type": "string", "minLength": 1, "description": "学校类型，如 university / college / generic。" },
+    "system": {
+      "type": ["string", "null"],
+      "pattern": "^[a-z][a-z0-9_-]*$",
+      "description": "引用的教务系统 id，必须在 presets/systems/<id>/ 下存在；null 表示不绑定。"
+    },
+    "aliases": {
+      "type": "array",
+      "maxItems": 32,
+      "items": { "type": "string", "minLength": 1 },
+      "description": "搜索用别名 / 简称。"
+    },
+    "generic": {
+      "type": "boolean",
+      "description": "true 表示这是「通用作息」而非某所真实学校。"
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,19 @@
+{
+  "id": "urp",
+  "name": "URP 教务",
+  "version": "1.0.0",
+  "aliases": [
+    "urp",
+    "URP 教务"
+  ],
+  "detect": {
+    "markers": [
+      "urp",
+      "教学信息服务平台",
+      "jwgl\\.urp"
+    ],
+    "timetableTableIds": [],
+    "timetableTableClasses": [],
+    "gridCellIdPatterns": []
+  }
+}

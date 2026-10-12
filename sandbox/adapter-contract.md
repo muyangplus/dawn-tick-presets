@@ -1,9 +1,9 @@
-# 适配器接口契约（`presets/adapters/*.js`）
+# 解析器接口契约（`presets/systems/<system-id>/parse.js`）
 
-适配器负责把某个教务系统课表页面的 **HTML** 变成晓刻能用的**事件列表**。
+解析器负责把某个教务系统课表页面的 **HTML** 变成晓刻能用的**事件列表**。
 因为它是「外部贡献的、会被执行的代码」，所以它的运行环境是受限沙箱，接口也被刻意收窄。
 
-> 先读 [../../sandbox/README.md](../../sandbox/README.md) 了解沙箱的运行约束与拦截结果。
+> 先读 [README.md](README.md) 了解沙箱的运行约束与拦截结果。
 
 ---
 
@@ -29,7 +29,7 @@ export function parse({ html, url, hints }) {
 | --- | --- | --- |
 | `html` | `string` | 课表页面的 HTML（已登录后的页面）。**只读**，不要试图改写它。 |
 | `url` | `string` | 页面 URL，用于区分同一系统的不同入口。 |
-| `hints` | `object` | 来自 `presets/systems/*.json` 的 `detect` 提示（表格 id / class / 格子 id 正则等）。可能为空对象。 |
+| `hints` | `object` | 来自 `presets/systems/<id>/meta.json` 的 `detect` 提示（表格 id / class / 格子 id 正则等）。可能为空对象。 |
 
 入参在沙箱里被 `Object.freeze`，写入不会生效。
 
@@ -71,12 +71,12 @@ export function parse({ html, url, hints }) {
 
 ## 3. 运行约束（沙箱）
 
-适配器在**受限子进程**中执行，不是 `vm` 裸跑，也不是在主进程里直接 `import`：
+解析器在**受限子进程**中执行，与主进程隔离，不在主进程内直接 `import`：
 
 | 约束项 | 取值方式 | 说明 |
 | --- | --- | --- |
 | 权限模型 | `node --permission` | Node 24 的权限系统 |
-| 文件读取 | `--allow-fs-read=<适配器目录>` | 只读白名单，只放开 `presets/adapters/` |
+| 文件读取 | `--allow-fs-read=<系统目录>` | 只读白名单，只放开 `presets/systems/<id>/` |
 | 文件写入 | ❌ 拒绝 | 不传 `--allow-fs-write` |
 | 子进程 | ❌ 拒绝 | 不传 `--allow-child-process` |
 | worker_threads | ❌ 拒绝 | 不传 `--allow-worker` |
@@ -96,9 +96,10 @@ export function parse({ html, url, hints }) {
 
 ---
 
-## 4. 怎么写一个适配器
+## 4. 怎么写一个解析器
 
-参考最小可运行示例 **[jwglxt.js](jwglxt.js)**，它从正方课表页的 `kbtable` 里抓 `id="1-2"` 形式的格子：
+参考最小可运行示例 **[../presets/systems/jwglxt/parse.js](../presets/systems/jwglxt/parse.js)**，
+它从正方课表页的 `kbtable` 里抓 `id="1-2"` 形式的格子：
 
 ```js
 export function parse({ html, url, hints }) {
@@ -118,35 +119,40 @@ export function parse({ html, url, hints }) {
 
 - **只用正则和字符串处理**（沙箱里没有 DOM，也拿不到任何库）。
 - 循环务必有界：`while (match !== null)` + `re.exec` 会自然收敛；不要写 `while (true)`。
-- `hints` 里可能带着 `presets/systems/<id>.json` 的 `detect` 提示，优先用它，别硬编码。
+- `hints` 里可能带着 `presets/systems/<id>/meta.json` 的 `detect` 提示，优先用它，别硬编码。
 - 单个格子里多条课程（换行分隔）需自行切分。
 - 数量级目标：1000 行以内的 HTML 应在几十毫秒内解析完。
 
-### 必须附带自检用例
+### 必须附带夹具（硬规则）
 
-新增适配器时，同时提交 `test/conformance/<id>.json`：
+只要 `presets/systems/<id>/parse.js` 存在，同目录的 `fixtures/` 就**必须**至少包含：
+
+1. 页面样本：`sample-page.html`（脱敏后的真实课表页）；
+2. 期望事件：`expected-events.json`：
 
 ```json
 {
-  "id": "jwglxt-usts-sample",
+  "id": "jwglxt-sample-page",
   "system": "jwglxt",
-  "adapter": "jwglxt.js",
-  "input": {
-    "html": "<table id=\"kbtable\"><tr><td id=\"1-2\">高等数学<br>张伟 老师<br>A101</td></tr></table>",
-    "url": "https://jwgl.usts.edu.cn/jwglxt/xskb/query",
-    "hints": {}
-  },
+  "school": "usts",
+  "adapter": "parse.js",
+  "fixtures": { "page": "sample-page.html", "events": "expected-events.json" },
+  "input": { "url": "https://jwgl.usts.edu.cn/jwglxt/xskb/query", "hints": {} },
   "expect": {
-    "minEvents": 1,
+    "minEvents": 2,
     "events": [
-      { "title": "高等数学", "dayOfWeek": 2, "periodStart": 1, "periodEnd": 2, "room": "A101", "teacher": "张伟", "weeks": [] }
+      { "title": "高等数学", "dayOfWeek": 2, "periodStart": 1, "periodEnd": 2, "room": "A101", "teacher": "张伟", "weeks": [] },
+      { "title": "大学英语", "dayOfWeek": 4, "periodStart": 1, "periodEnd": 2, "room": "B203", "teacher": "李娜", "weeks": [] },
+      { "title": "线性代数", "dayOfWeek": 3, "periodStart": 3, "periodEnd": 4, "room": "C305", "teacher": "王强", "weeks": [] }
     ]
   }
 }
 ```
 
-- `expect.minEvents` 由 `npm run validate` 强制校验；
-- `expect.events` 是给人看的完整期望（当前校验器校验数量下限，未来会做逐条 diff）；
+- `fixtures/` 缺失或为空 → **`npm run validate` 直接失败**（这是本次结构调整的主要收益）；
+- `npm run validate` 会在沙箱里用 `sample-page.html` 真跑一遍 `parse.js`，产出事件必须与
+  `expected-events.json` 里的 `expect.events` **逐条一致**；`expect.minEvents` 是最低条数门槛；
+- `expect.events` 是给人看的完整期望，也是沙箱逐条比对的基准；
 - HTML 请**脱敏**：删掉学号、姓名、Cookie、真实 token，只保留结构。
 
 ### 本地自查
@@ -154,14 +160,14 @@ export function parse({ html, url, hints }) {
 ```bash
 npm run validate      # 含静态扫描 + 沙箱冒烟
 npm test              # 单元测试
-npm run sandbox:demo  # 看沙箱如何拦截越权/死循环适配器
+npm run sandbox:demo  # 看沙箱如何拦截越权/死循环解析器
 ```
 
-想手动跑一个适配器：
+想手动跑一个解析器：
 
 ```bash
 node --permission --disallow-code-generation-from-strings \
-     --allow-fs-read=presets/adapters \
-     scripts/sandbox-run.mjs --sandbox-child presets/adapters/jwglxt.js \
+     --allow-fs-read=presets/systems/jwglxt \
+     scripts/sandbox-run.mjs --sandbox-child presets/systems/jwglxt/parse.js \
   <<< '{"html":"<table id=\"kbtable\"><tr><td id=\"1-2\">高数<br>张伟 老师<br>A101</td></tr></table>","url":"https://jwgl.usts.edu.cn/","hints":{}}'
 ```

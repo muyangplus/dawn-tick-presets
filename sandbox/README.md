@@ -21,15 +21,15 @@
   │  execFile(node, [
   │      '--permission',                              ← Node 权限模型
   │      '--disallow-code-generation-from-strings',   ← 禁 eval / new Function
-  │      '--allow-fs-read=<presets/adapters>',        ← 只读白名单（仅适配器目录）
-  │      <sandbox-run.mjs> '--sandbox-child' <adapter> ← 双角色文件
+  │      '--allow-fs-read=<presets/systems/<id>>',    ← 只读白名单（仅该系统目录）
+  │      <sandbox-run.mjs> '--sandbox-child' <parse.js 路径> ← 双角色文件
   │  ], { timeout: <墙钟上限>, stdio: 'pipe', env: 白名单 })
   │
   │  ── stdin：{ html, url, hints }（只有输入数据）
   │  ── stdout：{ ok, events?, error? }（必须是 JSON）
   ▼
 子进程（沙箱内）
-  ├─ 按 `import()` 加载适配器（读权限仅覆盖适配器目录）
+  ├─ 按 `import()` 加载解析器（读权限仅覆盖该系统目录）
   ├─ 调用 parse(frozenCtx)
   └─ 同步校验返回结构 → 写 JSON → 退出
 ```
@@ -74,7 +74,8 @@
 npm run sandbox:demo
 ```
 
-会依次展示：正常适配器成功 → 越权写文件被拒 → `eval`/`new Function` 被拒 → 死循环被超时终止。
+依次展示：正常解析器成功（用 `presets/systems/jwglxt/fixtures/sample-page.html`）→ 越权写文件被拒 →
+`eval`/`new Function` 被拒 → 死循环被超时终止。
 
 单独探测当前 Node 用的权限参数：
 
@@ -83,5 +84,17 @@ node scripts/sandbox-run.mjs --probe
 # {"node":"v24.19.0","detected":{"flag":"--permission","label":"--permission（Node 23+ 稳定名）"}}
 ```
 
+手动运行一个系统解析器（读权限只放开该系统目录）：
+
+```bash
+node --permission --disallow-code-generation-from-strings \
+     --allow-fs-read=presets/systems/jwglxt \
+     scripts/sandbox-run.mjs --sandbox-child presets/systems/jwglxt/parse.js \
+  < /dev/stdin <<'JSON'
+{"html":"<table id=\"kbtable\"><tr><td id=\"1-2\">高数<br>张伟 老师<br>A101</td></tr></table>","url":"https://jwgl.usts.edu.cn/","hints":{}}
+JSON
+```
+
 测试夹具（`test/fixtures/`）里的 `evil-adapter.js`、`codegen-adapter.js`、`hang-adapter.js`
-**只在 demo 与测试中使用**，绝不会被放进 `presets/adapters/`（`validate` 只扫描后者）。
+**只在 demo 与测试中使用**，绝不会被放进 `presets/systems/*/parse.js`（`validate` 只扫描后者）。
+系统自己的夹具放在 `presets/systems/<id>/fixtures/`，是**数据**（页面样本 + 期望事件），不是可执行代码。

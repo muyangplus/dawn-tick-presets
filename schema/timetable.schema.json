@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://dawn-tick.dev/schema/timetables.schema.json",
-  "title": "DawnTick 作息时间表",
-  "description": "学校作息时间表。仓库内每个文件描述一张表，文件名必须与 id 一致。",
+  "$id": "https://dawn-tick.dev/schema/timetable.schema.json",
+  "title": "DawnTick 作息时间表（schools/<id>/timetable.json）",
+  "description": "某个学校的作息时间表。id 可以与学校目录名不同（通用作息目录名为 _default、id 为 default）。",
   "type": "object",
   "required": ["id", "name", "periods"],
   "properties": {
@@ -10,7 +10,7 @@
       "type": "string",
       "minLength": 1,
       "pattern": "^[a-z][a-z0-9_-]*$",
-      "description": "小写稳定标识，必须与文件名一致（如 usts.json → usts）。"
+      "description": "小写稳定标识（如 usts / default）。"
     },
     "name": {
       "type": "string",
@@ -25,7 +25,7 @@
       "type": "array",
       "minItems": 1,
       "maxItems": 24,
-      "description": "节次列表，必须按 periodNo 严格递增且不重叠。",
+      "description": "节次列表，必须按 periodNo 严格递增、从 1 起连续且不重叠。",
       "items": {
         "type": "object",
         "required": ["periodNo", "start", "end"],

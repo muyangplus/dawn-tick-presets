@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dawn-tick.dev/schema/school-config.schema.json",
+  "title": "DawnTick 学校对教务系统的覆盖（schools/<dir>/config.json）",
+  "description": "只允许四个键：system（覆盖该校所用系统 id）、login（覆盖 entryPath/hint）、params（附加到入口 query 的字符串键值）、detect（仅允许向系统级特征里「追加」）。未知键一律校验失败。删除系统级特征是不允许的：detect 只做并集，不做删减。",
+  "type": "object",
+  "properties": {
+    "system": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_-]*$",
+      "description": "覆盖 schools/<dir>/meta.json 里的 system 引用。"
+    },
+    "login": {
+      "type": "object",
+      "description": "覆盖该系统 login.json 的 entryPath / hint（未写的字段沿用系统级值）。",
+      "properties": {
+        "entryPath": { "type": "string", "pattern": "^/" },
+        "hint": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "params": {
+      "type": "object",
+      "description": "附加到登录入口 query 的字符串键值对（如 { \"gnmkdm\": \"N2151\" }）。",
+      "additionalProperties": { "type": "string" }
+    },
+    "detect": {
+      "type": "object",
+      "description": "仅允许追加 markers / timetableTableIds / timetableTableClasses；不允许修改 gridCellIdPatterns，也不允许删除系统级特征。",
+      "properties": {
+        "markers": {
+          "type": "array",
+          "maxItems": 64,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "timetableTableIds": {
+          "type": "array",
+          "maxItems": 64,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "timetableTableClasses": {
+          "type": "array",
+          "maxItems": 64,
+          "items": { "type": "string", "minLength": 1 }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,22 @@
+{
+  "id": "jwglxt-sample-page",
+  "system": "jwglxt",
+  "school": "usts",
+  "adapter": "parse.js",
+  "fixtures": {
+    "page": "sample-page.html",
+    "events": "expected-events.json"
+  },
+  "input": {
+    "url": "https://jwgl.usts.edu.cn/jwglxt/xskb/query",
+    "hints": {}
+  },
+  "expect": {
+    "minEvents": 2,
+    "events": [
+      { "title": "高等数学", "dayOfWeek": 2, "periodStart": 1, "periodEnd": 2, "room": "A101", "teacher": "张伟", "weeks": [] },
+      { "title": "大学英语", "dayOfWeek": 4, "periodStart": 1, "periodEnd": 2, "room": "B203", "teacher": "李娜", "weeks": [] },
+      { "title": "线性代数", "dayOfWeek": 3, "periodStart": 3, "periodEnd": 4, "room": "C305", "teacher": "王强", "weeks": [] }
+    ]
+  }
+}

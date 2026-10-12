@@ -42,25 +42,25 @@ jobs:
         id: test
         run: npm test
 
-      - name: 生成快照
+      - name: 生成快照与 index.json
         id: snapshot
         run: npm run snapshot
 
-      - name: 校验快照内容哈希未变
+      - name: 校验快照与 index.json 未变（生成物必须已提交）
         id: hashcheck
         run: |
-          if ! git diff --quiet -- snapshot; then
-            echo '### ❌ 快照与提交内容不一致' >> "$GITHUB_STEP_SUMMARY"
+          if ! git diff --quiet -- snapshot presets/index.json; then
+            echo '### ❌ 生成物与提交内容不一致' >> "$GITHUB_STEP_SUMMARY"
             echo '' >> "$GITHUB_STEP_SUMMARY"
-            echo '内容变了但 `snapshot/presets-<version>.json` 没重新生成（或忘了提交）。' >> "$GITHUB_STEP_SUMMARY"
-            echo '请在本地跑 `npm run snapshot` 后一起提交。' >> "$GITHUB_STEP_SUMMARY"
+            echo '内容变了但 `snapshot/presets-<version>.json` / `presets/index.json` 没重新生成（或忘了提交）。' >> "$GITHUB_STEP_SUMMARY"
+            echo '请在本地跑 `npm run snapshot` 后一起提交这两个生成物（`presets/index.json` 禁止手改）。' >> "$GITHUB_STEP_SUMMARY"
             echo '' >> "$GITHUB_STEP_SUMMARY"
             echo '```diff' >> "$GITHUB_STEP_SUMMARY"
-            git diff -- snapshot >> "$GITHUB_STEP_SUMMARY"
+            git diff -- snapshot presets/index.json >> "$GITHUB_STEP_SUMMARY"
             echo '```' >> "$GITHUB_STEP_SUMMARY"
             exit 1
           fi
-          echo '快照与提交内容一致 ✓'
+          echo '快照与 index.json 均与提交内容一致 ✓'
 
       - name: 沙箱冒烟演示（正常适配器成功 + 越权/动态代码/死循环被拦截）
         id: demo
@@ -79,7 +79,7 @@ jobs:
             echo "| \`npm run validate\` | ${{ steps.validate.conclusion == 'success' && '✅ 通过' || '❌ 失败' }} |"
             echo "| \`npm test\` | ${{ steps.test.conclusion == 'success' && '✅ 通过' || '❌ 失败' }} |"
             echo "| \`npm run snapshot\` | ${{ steps.snapshot.conclusion == 'success' && '✅ 通过' || '❌ 失败' }} |"
-            echo "| 快照哈希未变 | ${{ steps.hashcheck.conclusion == 'success' && '✅ 一致' || '❌ 不一致' }} |"
+            echo "| 生成物未变（snapshot + index.json） | ${{ steps.hashcheck.conclusion == 'success' && '✅ 一致' || '❌ 不一致' }} |"
             echo "| \`npm run sandbox:demo\` | ${{ steps.demo.conclusion == 'success' && '✅ 通过' || '❌ 失败' }} |"
             echo ''
             echo '> 沙箱为**受限子进程**（Node 权限模型 + 资源上限 + 代码生成开关）；'

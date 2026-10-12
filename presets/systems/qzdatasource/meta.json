@@ -1,10 +1,17 @@
 {
   "id": "qzdatasource",
   "name": "强智教务",
-  "entryPath": "/jsxsd/",
-  "hint": "课表在「培养管理 → 我的课表」",
+  "version": "1.0.0",
+  "aliases": [
+    "qzdatasource",
+    "强智教务"
+  ],
   "detect": {
-    "markers": ["qzdatasource", "强智", "qzjw"],
+    "markers": [
+      "qzdatasource",
+      "强智",
+      "qzjw"
+    ],
     "timetableTableIds": [],
     "timetableTableClasses": [],
     "gridCellIdPatterns": []
